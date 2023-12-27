@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banco Exchange</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Additional styles if needed */
+  </style>
+</head>
+
+<body class="bg-white text-gray-800">
+  <div class="min-h-screen flex items-center justify-center">
+    <div class="max-w-lg mx-auto p-8">
+      <form action="/api/offer" method="POST">
+        <div class="grid gap-4">
+        <!-- Currency Input -->
+        <div class="flex items-center justify-between p-4 border-2 border-gray-300 rounded-md">
+          <span class="font-semibold" value="FUSD">FUSD</span>
+          <input type="hidden" name="inputCurrency" id="inputCurrency" value="FUSD">
+          <input type="text" name="input" placeholder="0.0"
+            class="text-right font-semibold bg-transparent outline-none">
+        </div>
+        <div class="text-right text-sm">~ 18750 EUR</div>
+
+        <!-- Arrow Down -->
+        <div class="flex justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+
+        <!-- Currency Output -->
+        <div class="flex items-center justify-between p-4 border-2 border-gray-300 rounded-md">
+          <span class="font-semibold" value="USDT">USDT</span>
+          <input type="hidden" name="outputCurrency" id="outputCurrency" value="USDT">
+          <input type="text" name="output" placeholder="0.0"
+            class="text-right font-semibold bg-transparent outline-none">
+        </div>
+        <div class="text-right text-sm">~ 18000 EUR</div>
+
+        <input type="hidden" name="traderScript" id="traderScript" value="0233676a30c2c1251fd1bc5dc7f9b465b6d80d4c545a4223057edec1f9d62aaef6" />
+
+        <!-- Submit Button -->
+        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+          Trade
+        </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+<script src="https://unpkg.com/htmx.org"></script>
+</html>
