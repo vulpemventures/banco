@@ -11,17 +11,25 @@ import (
 )
 
 func TestTrade_ExecuteTrade(t *testing.T) {
+	// setup ocean wallet client
+	walletSvc, err := NewWalletService("localhost:18000")
+	if err != nil {
+		t.Fatal("newOrder", err)
+	}
 	// Create a sample order
 	order, err := submitDummyOrder()
 	if err != nil {
-		t.Fatal("newOrder")
+		t.Fatal("newOrder", err)
 	}
 
-	// Create a new trade
-	trade := FromFundedOrder(order, &UTXO{
-		Txid:  "foo",
-		Index: 1,
-	})
+	trade := FromFundedOrder(
+		walletSvc,
+		order,
+		&UTXO{
+			Txid:  "foo",
+			Index: 1,
+		},
+	)
 
 	// Execute the trade
 	err = trade.ExecuteTrade()
@@ -31,6 +39,11 @@ func TestTrade_ExecuteTrade(t *testing.T) {
 }
 
 func TestTrade_CancelTrade(t *testing.T) {
+	// setup ocean wallet client
+	walletSvc, err := NewWaletService("http://localhost:18000")
+	if err != nil {
+		t.Fatal("newOrder")
+	}
 	// Create a sample order
 	order, err := submitDummyOrder()
 	if err != nil {
@@ -38,7 +51,7 @@ func TestTrade_CancelTrade(t *testing.T) {
 	}
 
 	// Create a new trade
-	trade := FromFundedOrder(order, &UTXO{
+	trade := FromFundedOrder(walletSvc, order, &UTXO{
 		Txid:  "foo",
 		Index: 1,
 	})

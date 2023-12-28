@@ -3,18 +3,21 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/vulpemventures/go-elements/elementsutil"
 	"github.com/vulpemventures/go-elements/network"
+	"github.com/vulpemventures/go-elements/payment"
 )
 
 type Order struct {
 	ID            string
 	Timestamp     time.Time
 	Address       string
+	PaymentData   *payment.Payment
 	FulfillScript []byte
 	RefundScript  []byte
 	TraderScript  []byte
@@ -48,7 +51,7 @@ func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, output
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse input value: %w", err)
 	}
-	inputAmount := uint64(float64(inputAsset.Precision) * inputValueFloat)
+	inputAmount := uint64(inputValueFloat * math.Pow(10, float64(inputAsset.Precision)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input asset: %w", err)
 	}
@@ -65,7 +68,7 @@ func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, output
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse output value: %w", err)
 	}
-	outputAmount := uint64(float64(outputAsset.Precision) * outputValueFloat)
+	outputAmount := uint64(outputValueFloat * math.Pow(10, float64(outputAsset.Precision)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get output asset: %w", err)
 	}
@@ -86,6 +89,7 @@ func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, output
 		ID:            uuid.New().String(),
 		Timestamp:     time.Now(),
 		Address:       address,
+		PaymentData:   output,
 		FulfillScript: fulfillScript,
 		RefundScript:  refundScript,
 		TraderScript:  traderScript,
@@ -104,4 +108,14 @@ func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, output
 			Amount: outputAmount,
 		},
 	}, nil
+}
+
+func (o *Order) OutputValue() float64 {
+	precision := currencyToAsset[assetToCurrency[o.Output.Asset]].Precision
+	return float64(o.Output.Amount) / float64(math.Pow10(precision))
+}
+
+func (o *Order) InputValue() float64 {
+	precision := currencyToAsset[assetToCurrency[o.Input.Asset]].Precision
+	return float64(o.Input.Amount) / float64(math.Pow10(precision))
 }

@@ -30,17 +30,12 @@ var orderBook OrderBook = OrderBook{
 	OrderIDByAddress: make(map[string]string),
 }
 
-type UTXO struct {
-	Txid   string `json:"txid"`
-	Index  int    `json:"index"`
-	Value  uint64 `json:"value"`
-	Status struct {
-		Confirmed bool `json:"confirmed"`
-	} `json:"status"`
-}
-
 func main() {
 	// Parse environment variables
+	oceanURL := os.Getenv("OCEAN_URL")
+	if oceanURL == "" {
+		oceanURL = "localhost:18000"
+	}
 	watchIntervalStr := os.Getenv("WATCH_INTERVAL_SECONDS")
 	watchInterval := -1
 	if watchIntervalStr != "" {
@@ -111,12 +106,22 @@ func main() {
 			return
 		}
 
-		if coinsAreMoreThan(utxos, uint64(order.Input.Amount)) {
-			// TODO Update the global state
+		status := "PENDING"
+		if coinsAreMoreThan(utxos, order.Input.Amount) {
+			//execute the trade
+			status = "FUNDED"
+			err := executeTrades(
+				order,
+				utxos,
+				oceanURL,
+			)
+			if err != nil {
+				err = fmt.Errorf("error executing trade: %v", err)
+				fmt.Println(err)
+				c.HTML(http.StatusInternalServerError, "error.html", gin.H{})
+				return
+			}
 		}
-
-		inputCurrency := assetToCurrency[order.Input.Asset]
-		outputCurrency := assetToCurrency[order.Output.Asset]
 
 		unspents := make([]map[string]interface{}, len(utxos))
 		for i, utxo := range utxos {
@@ -126,14 +131,17 @@ func main() {
 				"Index":     utxo.Index,
 			}
 		}
+		inputCurrency := assetToCurrency[order.Input.Asset]
+		outputCurrency := assetToCurrency[order.Output.Asset]
 
 		c.HTML(http.StatusOK, "offer.html", gin.H{
 			"address":        order.Address,
-			"inputAmount":    order.Input.Amount,
+			"inputAmount":    order.InputValue(),
 			"inputCurrency":  inputCurrency,
-			"outputAmount":   order.Output.Amount,
+			"outputAmount":   order.OutputValue(),
 			"outputCurrency": outputCurrency,
 			"unspents":       unspents,
+			"status":         status,
 		})
 	})
 
@@ -144,7 +152,7 @@ func main() {
 	router.Run(":8080")
 }
 
-func coinsAreMoreThan(utxos []UTXO, amount uint64) bool {
+func coinsAreMoreThan(utxos []*UTXO, amount uint64) bool {
 	// Calculate the total value of UTXOs
 	totalValue := uint64(0)
 	for _, utxo := range utxos {
@@ -154,7 +162,34 @@ func coinsAreMoreThan(utxos []UTXO, amount uint64) bool {
 	return totalValue >= amount
 }
 
-func fetchUnspents(address string) ([]UTXO, error) {
+func executeTrades(order *Order, unspents []*UTXO, oceanURL string) error {
+	walletSvc, err := NewWalletService(oceanURL)
+	if err != nil {
+		return err
+	}
+
+	for _, unspent := range unspents {
+		trade := FromFundedOrder(
+			walletSvc,
+			order,
+			unspent,
+		)
+
+		if trade.Status != Funded {
+			return fmt.Errorf("trade is not funded: %v", err)
+		}
+
+		// Execute the trade
+		err := trade.ExecuteTrade()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func fetchUnspents(address string) ([]*UTXO, error) {
 	apiURL := fmt.Sprintf("https://blockstream.info/liquidtestnet/api/address/%s/utxo", address)
 
 	resp, err := http.Get(apiURL)
@@ -170,7 +205,7 @@ func fetchUnspents(address string) ([]UTXO, error) {
 		return nil, err
 	}
 
-	var utxos []UTXO
+	var utxos []*UTXO
 	err = json.Unmarshal(body, &utxos)
 	if err != nil {
 		fmt.Printf("Error unmarshaling JSON: %v\n", err)

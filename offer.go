@@ -18,7 +18,7 @@ const (
 	OP_INSPECTOUTPUTASSET        = 0xce
 	OP_INSPECTOUTPUTVALUE        = 0xcf
 	OP_PUSHCURRENTINPUTINDEX     = 0xcd
-	unspendablePoint             = "0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+	UNSPENDABLE_POINT            = "0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
 )
 
 func CreateFundingOutput(fulfillScript []byte, refundScript []byte, net *network.Network) (*payment.Payment, error) {
@@ -26,7 +26,7 @@ func CreateFundingOutput(fulfillScript []byte, refundScript []byte, net *network
 		net = &network.Testnet
 	}
 
-	unspendableKeyBytes, err := hex.DecodeString(unspendablePoint)
+	unspendableKeyBytes, err := hex.DecodeString(UNSPENDABLE_POINT)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding unspendable key bytes: %w", err)
 	}
