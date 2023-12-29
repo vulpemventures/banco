@@ -50,7 +50,20 @@ func CreateFundingOutput(fulfillScript []byte, refundScript []byte, net *network
 }
 
 func FulfillScript(recipientScript []byte, outputAmount uint64, outputAsset []byte) ([]byte, error) {
-	fulfillScript, err := compileFulfillClause(0, recipientScript[:2], recipientScript[2:], outputAmount, outputAsset)
+	var scriptVersion int
+	switch recipientScript[0] {
+	case 0x4f:
+		scriptVersion = -1 // OP_1NEGATE
+	case 0x00:
+		scriptVersion = 0 // OP_0
+	case 0x51:
+		scriptVersion = 1 // OP_1
+	default:
+		return nil, fmt.Errorf("unknown script version")
+	}
+
+	scriptProgram := recipientScript[2:]
+	fulfillScript, err := compileFulfillClause(0, scriptVersion, scriptProgram, outputAmount, outputAsset)
 	if err != nil {
 		return nil, fmt.Errorf("error building the fulfill script: %w", err)
 	}
@@ -58,6 +71,7 @@ func FulfillScript(recipientScript []byte, outputAmount uint64, outputAsset []by
 }
 
 func RefundScript(recipientScript []byte, inputAmount uint64, inputAsset []byte) ([]byte, error) {
+	// TODO properly check the scritp version type like FulfillScript
 	refundScript, err := compileRefundClause(0, recipientScript[:2], recipientScript[2:], inputAmount, inputAsset)
 	if err != nil {
 		return nil, fmt.Errorf("error building the refund script: %w", err)
@@ -65,10 +79,11 @@ func RefundScript(recipientScript []byte, inputAmount uint64, inputAsset []byte)
 	return refundScript, nil
 }
 
-func compileFulfillClause(outputIndex uint64, traderFulfillScriptVersion []byte, traderFulfillScriptProgram []byte, outputAmount uint64, outputAsset []byte) ([]byte, error) {
+func compileFulfillClause(outputIndex uint64, traderFulfillScriptVersion int, traderFulfillScriptProgram []byte, outputAmount uint64, outputAsset []byte) ([]byte, error) {
 
 	index := scriptNum(outputIndex).Bytes()
-	assetBuffer := elementsutil.ReverseBytes(outputAsset)
+	scriptVersion := scriptNum(traderFulfillScriptVersion).Bytes()
+	assetBuffer := outputAsset[1:]
 	amountBuffer := make([]byte, 8)
 	binary.LittleEndian.PutUint64(amountBuffer, outputAmount)
 
@@ -76,7 +91,7 @@ func compileFulfillClause(outputIndex uint64, traderFulfillScriptVersion []byte,
 
 	builder.AddData(index)
 	builder.AddOp(OP_INSPECTOUTPUTSCRIPTPUBKEY)
-	builder.AddData(traderFulfillScriptVersion)
+	builder.AddData(scriptVersion)
 	builder.AddOp(txscript.OP_EQUALVERIFY)
 	builder.AddData(traderFulfillScriptProgram)
 	builder.AddOp(txscript.OP_EQUALVERIFY)

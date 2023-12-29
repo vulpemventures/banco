@@ -50,7 +50,7 @@ func TestCreateFundingOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.NoError(t, err)
-	assert.Equal(t, "tex1p0cawphgeq9whl80f0a89nraj7xdjl58cz9xx7qdet5axd283ffnqw9mzw8", addr)
+	assert.Equal(t, "tex1p23k6jtxynn5jlcz6lhw03dlhyc75tw5z0ugg7fz557r0ql2w6rvq4l748y", addr)
 }
 
 func TestFulfillTransaction(t *testing.T) {

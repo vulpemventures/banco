@@ -5,7 +5,8 @@ go 1.21.5
 require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1
 	github.com/gin-gonic/gin v1.9.1
-	github.com/vulpemventures/go-elements v0.5.0
+	github.com/vulpemventures/go-elements v0.5.1
+	google.golang.org/grpc v1.53.0
 )
 
 require (
@@ -19,12 +20,11 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/vulpemventures/fastsha256 v0.0.0-20160815193821-637e65642941 // indirect
 	google.golang.org/genproto v0.0.0-20230223222841-637eb2293923 // indirect
-	google.golang.org/grpc v1.53.0 // indirect
 )
 
 require (
 	github.com/btcsuite/btcd v0.23.4
-	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect

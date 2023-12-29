@@ -37,8 +37,8 @@
                     <h2 class="text-2xl font-semibold mb-4">Offer Details</h2>
                     <div class="border-t border-gray-300 pt-4">
                         <p class="text-gray-600">Status: {{.status}}</p>
-                        <p class="text-gray-600">You send: {{.inputAmount}} {{.inputCurrency}}</p>
-                        <p class="text-gray-600">You receive: {{.outputAmount}} {{.outputCurrency}}</p>
+                        <p class="text-gray-600">You send: {{.inputValue}} {{.inputCurrency}}</p>
+                        <p class="text-gray-600">You receive: {{.outputValue}} {{.outputCurrency}}</p>
                     </div>
                 </div>
                 <div class="border rounded-lg mt-8 p-4 w-full md:w-3/4 lg:w-1/2">
@@ -52,6 +52,10 @@
                         Copy
                     </button>
                 </div>
+                <button onclick="payWithMarina()"
+                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 mt-4 rounded">
+                    Pay with Marina
+                </button>
             </div>
             <div>
                 <h2 class="text-2xl font-semibold mb-4">Transactions</h2>
@@ -60,7 +64,7 @@
                     <div class="flex justify-between items-center py-2">
                         <p class="text-gray-600">TxID: {{.TxidShort}}</p>
                         <p class="text-gray-600">Index: {{.Index}}</p>
-                        
+
                     </div>
                     {{end}}
                     {{if eq (len .unspents) 0}}
@@ -68,10 +72,29 @@
                     <p class="text-gray-600">Make a deposit to the address to fund your trade.</p>
                     {{end}}
                 </div>
-                </div>
             </div>
         </div>
     </div>
+    <script>
+        async function payWithMarina() {
+            console.log( {
+                        address: "{{.address}}", // the address of the recipient
+                        asset: "{{.inputAssetHash}}", // the asset to send
+                        value: "{{.inputAmount}}" // amount always expressed in satoshis
+                    })
+            // Send 0.007 LBTC to an address
+            const { txid, hex } = await window.marina.sendTransaction(
+                [
+                    {
+                        address: "{{.address}}", // the address of the recipient
+                        asset: "{{.inputAssetHash}}", // the asset to send
+                        value: Number("{{.inputAmount}}") // amount always expressed in satoshis
+                    }
+                ],
+            );
+            console.log(txid, hex)
+        }
+    </script>
 </body>
 
 </html>

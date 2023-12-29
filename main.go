@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/vulpemventures/go-elements/transaction"
 )
 
 // Global state and mutex
@@ -131,17 +132,27 @@ func main() {
 				"Index":     utxo.Index,
 			}
 		}
+
 		inputCurrency := assetToCurrency[order.Input.Asset]
 		outputCurrency := assetToCurrency[order.Output.Asset]
 
+		/* transactions, err := fetchTransactionHistory(order.Address)
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{})
+			return
+		} */
+
 		c.HTML(http.StatusOK, "offer.html", gin.H{
 			"address":        order.Address,
-			"inputAmount":    order.InputValue(),
+			"inputValue":     order.InputValue(),
 			"inputCurrency":  inputCurrency,
-			"outputAmount":   order.OutputValue(),
+			"outputValue":    order.OutputValue(),
 			"outputCurrency": outputCurrency,
 			"unspents":       unspents,
+			//"transactions":   transactions,
 			"status":         status,
+			"inputAssetHash": order.Input.Asset,
+			"inputAmount":    order.Input.Amount,
 		})
 	})
 
@@ -169,6 +180,11 @@ func executeTrades(order *Order, unspents []*UTXO, oceanURL string) error {
 	}
 
 	for _, unspent := range unspents {
+		prevout, err := fetchPrevout(unspent.Txid, unspent.Index)
+		if err != nil {
+			return err
+		}
+		unspent.Prevout = prevout
 		trade := FromFundedOrder(
 			walletSvc,
 			order,
@@ -180,13 +196,75 @@ func executeTrades(order *Order, unspents []*UTXO, oceanURL string) error {
 		}
 
 		// Execute the trade
-		err := trade.ExecuteTrade()
+		err = trade.ExecuteTrade()
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+type Transaction struct {
+	TxID   string `json:"txid"`
+	Status struct {
+		Confirmed   bool   `json:"confirmed"`
+		BlockHeight int    `json:"block_height"`
+		BlockHash   string `json:"block_hash"`
+		BlockTime   int    `json:"block_time"`
+	} `json:"status"`
+}
+
+func fetchTransactionHistory(address string) ([]Transaction, error) {
+	apiURL := fmt.Sprintf("https://blockstream.info/liquidtestnet/api/address/%s/txs", address)
+
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		fmt.Printf("Error fetching transaction history: %v\n", err)
+		return nil, err
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		fmt.Printf("Error reading response body: %v\n", err)
+		return nil, err
+	}
+
+	var transactions []Transaction
+	err = json.Unmarshal(body, &transactions)
+	if err != nil {
+		fmt.Printf("Error unmarshaling JSON: %v\n", err)
+		return nil, err
+	}
+
+	return transactions, nil
+}
+
+func fetchPrevout(txHash string, txIndex int) (*transaction.TxOutput, error) {
+	apiURL := fmt.Sprintf("https://blockstream.info/liquidtestnet/api/tx/%s/hex", txHash)
+
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		fmt.Printf("Error fetching raw transaction: %v\n", err)
+		return nil, err
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		fmt.Printf("Error reading response body: %v\n", err)
+		return nil, err
+	}
+
+	tx, err := transaction.NewTxFromHex(string(body))
+	if err != nil {
+		fmt.Printf("Error creating transaction from hex: %v\n", err)
+		return nil, err
+	}
+
+	txOutput := tx.Outputs[txIndex]
+	return txOutput, nil
 }
 
 func fetchUnspents(address string) ([]*UTXO, error) {

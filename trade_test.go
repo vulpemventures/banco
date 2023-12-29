@@ -40,7 +40,7 @@ func TestTrade_ExecuteTrade(t *testing.T) {
 
 func TestTrade_CancelTrade(t *testing.T) {
 	// setup ocean wallet client
-	walletSvc, err := NewWaletService("http://localhost:18000")
+	walletSvc, err := NewWalletService("http://localhost:18000")
 	if err != nil {
 		t.Fatal("newOrder")
 	}

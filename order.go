@@ -73,8 +73,15 @@ func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, output
 		return nil, fmt.Errorf("failed to get output asset: %w", err)
 	}
 
-	fulfillScript, _ := FulfillScript(traderScript, outputAmount, outputAssetBytes)
-	refundScript, _ := RefundScript(traderScript, inputAmount, inputAssetBytes)
+	fulfillScript, err := FulfillScript(traderScript, outputAmount, outputAssetBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create fulfill script: %w", err)
+	}
+
+	refundScript, err := RefundScript(traderScript, inputAmount, inputAssetBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create refund script: %w", err)
+	}
 
 	output, err := CreateFundingOutput(fulfillScript, refundScript, &network.Testnet)
 	if err != nil {
