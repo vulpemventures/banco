@@ -26,7 +26,7 @@ WORKDIR /app
 COPY --from=builder /app/bin/banco /usr/local/bin/
 
 # Expose the port that the server listens on
-EXPOSE 3000
+EXPOSE 8080
 
 # Set the command to run the server when the container starts
 ENTRYPOINT ["/usr/local/bin/banco"]
