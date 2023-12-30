@@ -7,7 +7,6 @@ import (
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/vulpemventures/go-elements/elementsutil"
 	"github.com/vulpemventures/go-elements/network"
 	"github.com/vulpemventures/go-elements/payment"
 	"github.com/vulpemventures/go-elements/taproot"
@@ -72,7 +71,19 @@ func FulfillScript(recipientScript []byte, outputAmount uint64, outputAsset []by
 
 func RefundScript(recipientScript []byte, inputAmount uint64, inputAsset []byte) ([]byte, error) {
 	// TODO properly check the scritp version type like FulfillScript
-	refundScript, err := compileRefundClause(0, recipientScript[:2], recipientScript[2:], inputAmount, inputAsset)
+	var scriptVersion int
+	switch recipientScript[0] {
+	case 0x4f:
+		scriptVersion = -1 // OP_1NEGATE
+	case 0x00:
+		scriptVersion = 0 // OP_0
+	case 0x51:
+		scriptVersion = 1 // OP_1
+	default:
+		return nil, fmt.Errorf("unknown script version")
+	}
+	scriptProgram := recipientScript[2:]
+	refundScript, err := compileRefundClause(0, scriptVersion, scriptProgram, inputAmount, inputAsset)
 	if err != nil {
 		return nil, fmt.Errorf("error building the refund script: %w", err)
 	}
@@ -116,9 +127,10 @@ func compileFulfillClause(outputIndex uint64, traderFulfillScriptVersion int, tr
 	return script, nil
 }
 
-func compileRefundClause(outputIndex uint64, traderRefundScriptVersion []byte, traderRefundScriptProgram []byte, inputAmount uint64, inputAsset []byte) ([]byte, error) {
+func compileRefundClause(outputIndex uint64, traderRefundScriptVersion int, traderRefundScriptProgram []byte, inputAmount uint64, inputAsset []byte) ([]byte, error) {
 	index := scriptNum(outputIndex).Bytes()
-	assetBuffer := elementsutil.ReverseBytes(inputAsset)
+	scriptVersion := scriptNum(traderRefundScriptVersion).Bytes()
+	assetBuffer := inputAsset[1:]
 	amountBuffer := make([]byte, 8)
 	binary.LittleEndian.PutUint64(amountBuffer, inputAmount)
 
@@ -126,7 +138,7 @@ func compileRefundClause(outputIndex uint64, traderRefundScriptVersion []byte, t
 
 	builder.AddData(index)
 	builder.AddOp(OP_INSPECTOUTPUTSCRIPTPUBKEY)
-	builder.AddData(traderRefundScriptVersion)
+	builder.AddData(scriptVersion)
 	builder.AddOp(txscript.OP_EQUALVERIFY)
 	builder.AddData(traderRefundScriptProgram)
 	builder.AddOp(txscript.OP_EQUALVERIFY)

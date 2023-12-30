@@ -6,6 +6,96 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wallet Transactions</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+
+<body class="bg-white text-gray-800">
+    <div class="container mx-auto p-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="flex flex-col items-center">
+                <div>
+                    <h2 class="text-2xl font-semibold mb-4">Offer Details</h2>
+                    <div class="border-t border-gray-300 pt-4">
+                        <p class="text-gray-600">You send: {{.inputValue}} {{.inputCurrency}}</p>
+                        <p class="text-gray-600">You receive: {{.outputValue}} {{.outputCurrency}}</p>
+                    </div>
+                </div>
+                <div class="border rounded-lg mt-8 p-4 w-full md:w-3/4 lg:w-1/2">
+                    <div id="qrcode" class="mx-auto"></div>
+                </div>
+                <div class="flex mt-4 w-full md:w-3/4 lg:w-1/2">
+                    <input id="walletAddress" type="text" value="{{.address}}"
+                        class="border rounded-l-lg p-2 flex-grow text-lg" readonly>
+                    <button onclick="copyToClipboard()"
+                        class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded-r-lg">
+                        Copy
+                    </button>
+                </div>
+                <button onclick="payWithMarina()"
+                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 mt-4 rounded">
+                    Pay with Marina
+                </button>
+            </div>
+            <div>
+                <h2 class="text-2xl font-semibold mb-4">Transactions</h2>
+                {{if .transactions}}
+                <div class="unconfirmed-transactions">
+                    <h3 class="text-xl font-semibold mb-2">Pending</h3>
+                    {{range .transactions}}
+                    {{if not .Confirmed}}
+                    <div class="transaction-row">
+                        <p class="transaction-id">
+                            <a href="https://blockstream.info/liquidtestnet/tx/{{.Txid}}" target="_blank">🔗 {{.TxidShort}}</a>
+                        </p>
+                        <p class="block-time">📆 {{.Date}}</p>
+                    </div>
+                    {{end}}
+                    {{end}}
+                </div>
+                <div class="confirmed-transactions">
+                    <h3 class="text-xl font-semibold mb-2">Confirmed</h3>
+                    {{range .transactions}}
+                        {{if .Confirmed}}
+                        <div class="transaction-row">
+                            <p class="transaction-id">
+                                <a href="https://blockstream.info/liquidtestnet/tx/{{.Txid}}" target="_blank">🔗 {{.TxidShort}}</a>
+                            </p>
+                            <p class="block-time">📆 {{.Date}}</p>
+                        </div>
+                        {{end}}
+                    {{end}}
+                </div>
+                {{else}}
+                <p>No transactions yet! Make one from any wallet to fund the offer.</p>
+                {{end}}
+            </div>
+        </div>
+    </div>
+
+    
+    <script>
+        async function payWithMarina() {
+            console.log({
+                address: "{{.address}}", // the address of the recipient
+                asset: "{{.inputAssetHash}}", // the asset to send
+                value: "{{.inputAmount}}" // amount always expressed in satoshis
+            })
+            // Send 0.007 LBTC to an address
+            const { txid, hex } = await window.marina.sendTransaction(
+                [
+                    {
+                        address: "{{.address}}", // the address of the recipient
+                        asset: "{{.inputAssetHash}}", // the asset to send
+                        value: Number("{{.inputAmount}}") // amount always expressed in satoshis
+                    }
+                ],
+            );
+            console.log(txid, hex)
+        }
+    </script>
+    <script>
+        new QRCode(document.getElementById("qrcode"),"{{.address}}");
+    </script>
     <script>
         function copyToClipboard() {
             const copyText = "{{.address}}";
@@ -27,74 +117,29 @@
             document.body.removeChild(el);
         }
     </script>
-</head>
 
-<body class="bg-white text-gray-800">
-    <div class="container mx-auto p-8">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="flex flex-col items-center">
-                <div>
-                    <h2 class="text-2xl font-semibold mb-4">Offer Details</h2>
-                    <div class="border-t border-gray-300 pt-4">
-                        <p class="text-gray-600">Status: {{.status}}</p>
-                        <p class="text-gray-600">You send: {{.inputValue}} {{.inputCurrency}}</p>
-                        <p class="text-gray-600">You receive: {{.outputValue}} {{.outputCurrency}}</p>
-                    </div>
-                </div>
-                <div class="border rounded-lg mt-8 p-4 w-full md:w-3/4 lg:w-1/2">
-                    <img src="https://via.placeholder.com/300" alt="QR Code" class="mx-auto">
-                </div>
-                <div class="flex mt-4 w-full md:w-3/4 lg:w-1/2">
-                    <input id="walletAddress" type="text" value="{{.address}}"
-                        class="border rounded-l-lg p-2 flex-grow text-lg" readonly>
-                    <button onclick="copyToClipboard()"
-                        class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded-r-lg">
-                        Copy
-                    </button>
-                </div>
-                <button onclick="payWithMarina()"
-                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 mt-4 rounded">
-                    Pay with Marina
-                </button>
-            </div>
-            <div>
-                <h2 class="text-2xl font-semibold mb-4">Transactions</h2>
-                <div class="border-t border-gray-300 pt-4">
-                    {{range .unspents}}
-                    <div class="flex justify-between items-center py-2">
-                        <p class="text-gray-600">TxID: {{.TxidShort}}</p>
-                        <p class="text-gray-600">Index: {{.Index}}</p>
-
-                    </div>
-                    {{end}}
-                    {{if eq (len .unspents) 0}}
-                    <p class="text-gray-600">No transactions yet.</p>
-                    <p class="text-gray-600">Make a deposit to the address to fund your trade.</p>
-                    {{end}}
-                </div>
-            </div>
-        </div>
-    </div>
-    <script>
-        async function payWithMarina() {
-            console.log( {
-                        address: "{{.address}}", // the address of the recipient
-                        asset: "{{.inputAssetHash}}", // the asset to send
-                        value: "{{.inputAmount}}" // amount always expressed in satoshis
-                    })
-            // Send 0.007 LBTC to an address
-            const { txid, hex } = await window.marina.sendTransaction(
-                [
-                    {
-                        address: "{{.address}}", // the address of the recipient
-                        asset: "{{.inputAssetHash}}", // the asset to send
-                        value: Number("{{.inputAmount}}") // amount always expressed in satoshis
-                    }
-                ],
-            );
-            console.log(txid, hex)
+    <style>
+        .transaction-row {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
         }
-    </script>
-</body>
 
+        .transaction-id {
+            font-weight: bold;
+        }
+
+        .block-hash,
+        .block-time,
+        .mempool-status {
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .confirmed-transactions,
+        .unconfirmed-transactions {
+            margin-bottom: 20px;
+        }
+    </style>
+</body>
 </html>

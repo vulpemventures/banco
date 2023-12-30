@@ -155,7 +155,7 @@ func (t *Trade) PrepareFulfillTransaction(
 		}})
 	}
 
-	if changeProviderAmountOfFees > 0 {
+	if changeProviderAmountOfFees > FEE_AMOUNT {
 		updater.AddOutputs([]psetv2.OutputArgs{{
 			Asset:  currencyToAsset["tL-BTC"].AssetHash,
 			Amount: changeProviderAmountOfFees,
@@ -281,11 +281,12 @@ func (t *Trade) ExecuteTrade() error {
 	txHex, err := finalTx.ToHex()
 	if err != nil {
 		return fmt.Errorf("error in serializing tx hex: %w", err)
-
 	}
+
 	// Broadcast the transaction
 	txid, err := t.walletService.BroadcastTransaction(context.Background(), txHex)
 	if err != nil {
+		println(txHex)
 		return fmt.Errorf("error in broadcasting transaction: %w", err)
 	}
 	if len(txid) > 0 {

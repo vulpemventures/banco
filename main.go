@@ -17,7 +17,9 @@ import (
 
 // Global state and mutex
 var (
-	isPolling = false
+	isPolling  = false
+	errCh      = make(chan error)
+	orderQueue = make(chan *Order)
 )
 
 type OrderBook struct {
@@ -27,17 +29,17 @@ type OrderBook struct {
 }
 
 var orderBook OrderBook = OrderBook{
-	OrderByID:        make(map[string]*Order),
-	OrderIDByAddress: make(map[string]string),
+	OrderByID: make(map[string]*Order),
 }
+
+var oceanURL string = os.Getenv("OCEAN_URL")
+var watchIntervalStr string = os.Getenv("WATCH_INTERVAL_SECONDS")
 
 func main() {
 	// Parse environment variables
-	oceanURL := os.Getenv("OCEAN_URL")
 	if oceanURL == "" {
 		oceanURL = "localhost:18000"
 	}
-	watchIntervalStr := os.Getenv("WATCH_INTERVAL_SECONDS")
 	watchInterval := -1
 	if watchIntervalStr != "" {
 		var err error
@@ -45,6 +47,14 @@ func main() {
 		if err != nil {
 			log.Fatal("watchInterval: ", err)
 		}
+	}
+
+	//processOrderQueue(oceanURL)
+	if watchInterval > 0 {
+		// start watching
+		/* startWatching(func() {
+			processOrderQueue(oceanURL)
+		}, watchInterval) */
 	}
 
 	router := gin.Default()
@@ -65,21 +75,14 @@ func main() {
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{})
 			return
 		}
+
+		println("new order", order)
+		orderBook.mu.Lock()
 		orderBook.OrderByID[order.ID] = order
-		orderBook.OrderIDByAddress[order.Address] = order.ID
+		//orderQueue <- order
+		orderBook.mu.Unlock()
 
-		// TODO start watching a specific address You can use Elements Core JSONRPC
-		if watchInterval > 0 {
-			orderBook.mu.Lock()
-			if !isPolling {
-				go startPolling(order.Address, uint64(order.Input.Amount), order.Input.Asset) // Replace with actual address logic
-				isPolling = true
-				fmt.Println("Polling started for the address " + order.Address)
-			}
-			orderBook.mu.Unlock()
-		}
-
-		c.Redirect(http.StatusSeeOther, "/offer/"+order.Address)
+		c.Redirect(http.StatusSeeOther, "/offer/"+order.ID)
 	})
 
 	router.GET("/", func(c *gin.Context) {
@@ -88,59 +91,42 @@ func main() {
 		})
 	})
 
-	router.GET("/offer/:address", func(c *gin.Context) {
-		address := c.Params.ByName("address")
-		id, ok := orderBook.OrderIDByAddress[address]
-		if id == "" || !ok {
-			c.HTML(http.StatusNotFound, "404.html", gin.H{})
-			return
-		}
+	router.GET("/offer/:id", func(c *gin.Context) {
+		id := c.Params.ByName("id")
 		order, ok := orderBook.OrderByID[id]
 		if !ok {
 			c.HTML(http.StatusNotFound, "404.html", gin.H{})
 			return
 		}
 
-		utxos, err := fetchUnspents(order.Address)
+		err := watchForTrades(order, oceanURL)
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+			return
+		}
+
+		transactions, err := fetchTransactionHistory(order.Address)
 		if err != nil {
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{})
 			return
 		}
 
-		status := "PENDING"
-		if coinsAreMoreThan(utxos, order.Input.Amount) {
-			//execute the trade
-			status = "FUNDED"
-			err := executeTrades(
-				order,
-				utxos,
-				oceanURL,
-			)
-			if err != nil {
-				err = fmt.Errorf("error executing trade: %v", err)
-				fmt.Println(err)
-				c.HTML(http.StatusInternalServerError, "error.html", gin.H{})
-				return
+		println("fetched txs", len(transactions))
+
+		// manipulate template data and render page
+		transactionHistory := make([]map[string]interface{}, len(transactions))
+		for i, tx := range transactions {
+			transactionHistory[i] = map[string]interface{}{
+				"Txid":      tx.TxID,
+				"TxidShort": tx.TxID[:6] + "..." + tx.TxID[len(tx.TxID)-6:],
+				"Confirmed": tx.Status.Confirmed,
+				"Date":      time.Unix(int64(tx.Status.BlockTime), 0).Format("2006-01-02 15:04:05"),
+				"BlockHash": tx.Status.BlockHash,
+				"BlockTime": tx.Status.BlockTime,
 			}
 		}
-
-		unspents := make([]map[string]interface{}, len(utxos))
-		for i, utxo := range utxos {
-			unspents[i] = map[string]interface{}{
-				"Txid":      utxo.Txid,
-				"TxidShort": utxo.Txid[:6] + "..." + utxo.Txid[len(utxo.Txid)-6:],
-				"Index":     utxo.Index,
-			}
-		}
-
 		inputCurrency := assetToCurrency[order.Input.Asset]
 		outputCurrency := assetToCurrency[order.Output.Asset]
-
-		/* transactions, err := fetchTransactionHistory(order.Address)
-		if err != nil {
-			c.HTML(http.StatusInternalServerError, "error.html", gin.H{})
-			return
-		} */
 
 		c.HTML(http.StatusOK, "offer.html", gin.H{
 			"address":        order.Address,
@@ -148,9 +134,7 @@ func main() {
 			"inputCurrency":  inputCurrency,
 			"outputValue":    order.OutputValue(),
 			"outputCurrency": outputCurrency,
-			"unspents":       unspents,
-			//"transactions":   transactions,
-			"status":         status,
+			"transactions":   transactionHistory,
 			"inputAssetHash": order.Input.Asset,
 			"inputAmount":    order.Input.Amount,
 		})
@@ -161,48 +145,6 @@ func main() {
 	})
 
 	router.Run(":8080")
-}
-
-func coinsAreMoreThan(utxos []*UTXO, amount uint64) bool {
-	// Calculate the total value of UTXOs
-	totalValue := uint64(0)
-	for _, utxo := range utxos {
-		totalValue += utxo.Value
-	}
-
-	return totalValue >= amount
-}
-
-func executeTrades(order *Order, unspents []*UTXO, oceanURL string) error {
-	walletSvc, err := NewWalletService(oceanURL)
-	if err != nil {
-		return err
-	}
-
-	for _, unspent := range unspents {
-		prevout, err := fetchPrevout(unspent.Txid, unspent.Index)
-		if err != nil {
-			return err
-		}
-		unspent.Prevout = prevout
-		trade := FromFundedOrder(
-			walletSvc,
-			order,
-			unspent,
-		)
-
-		if trade.Status != Funded {
-			return fmt.Errorf("trade is not funded: %v", err)
-		}
-
-		// Execute the trade
-		err = trade.ExecuteTrade()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 type Transaction struct {
@@ -291,22 +233,4 @@ func fetchUnspents(address string) ([]*UTXO, error) {
 	}
 
 	return utxos, nil
-}
-
-func startPolling(address string, amount uint64, assetID string) {
-	for {
-		utxos, err := fetchUnspents(address)
-		if err != nil {
-			fmt.Printf("Error fetching UTXOs: %v\n", err)
-			continue
-		}
-
-		if coinsAreMoreThan(utxos, amount) {
-			fmt.Println(address + " being funded")
-			// TODO Update the global state
-		}
-
-		// Wait for a defined interval before polling again
-		time.Sleep(1 * time.Second)
-	}
 }
