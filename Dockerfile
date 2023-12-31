@@ -22,11 +22,15 @@ FROM alpine:latest
 # Set the working directory inside the container
 WORKDIR /app
 
+
+# Copy the web folder with HTML templates
+COPY web/ /app/web/
+
 # Copy the built binary from the previous stage
-COPY --from=builder /app/bin/banco /usr/local/bin/
+COPY --from=builder /app/bin/banco /app/banco
 
 # Expose the port that the server listens on
 EXPOSE 8080
 
 # Set the command to run the server when the container starts
-ENTRYPOINT ["/usr/local/bin/banco"]
+ENTRYPOINT ["/app/banco"]
