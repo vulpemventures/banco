@@ -6,17 +6,6 @@ import (
 	"time"
 )
 
-func processOrderQueue(oceanURL string) {
-	println(len(orderQueue))
-	for order := range orderQueue {
-		log.Println("watching address", order.Address)
-		err := watchForTrades(order, oceanURL)
-		if err != nil {
-			log.Fatalf("error in trade", err)
-		}
-	}
-}
-
 func startWatching(fn func(), watchInterval int) {
 	for {
 		fn()

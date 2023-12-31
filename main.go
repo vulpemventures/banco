@@ -1,36 +1,15 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/vulpemventures/go-elements/transaction"
+	_ "modernc.org/sqlite"
 )
-
-// Global state and mutex
-var (
-	isPolling  = false
-	errCh      = make(chan error)
-	orderQueue = make(chan *Order)
-)
-
-type OrderBook struct {
-	OrderByID        map[string]*Order
-	OrderIDByAddress map[string]string
-	mu               sync.Mutex
-}
-
-var orderBook OrderBook = OrderBook{
-	OrderByID: make(map[string]*Order),
-}
 
 var oceanURL string = os.Getenv("OCEAN_URL")
 var watchIntervalStr string = os.Getenv("WATCH_INTERVAL_SECONDS")
@@ -49,16 +28,17 @@ func main() {
 		}
 	}
 
-	//processOrderQueue(oceanURL)
 	if watchInterval > 0 {
 		// start watching
-		/* startWatching(func() {
-			processOrderQueue(oceanURL)
-		}, watchInterval) */
+		log.Println("Watcher not implemented yet")
+	}
+
+	_, err := initDB()
+	if err != nil {
+		log.Fatal("connectToDB: ", err)
 	}
 
 	router := gin.Default()
-
 	router.LoadHTMLGlob("web/*")
 
 	router.POST("/api/offer", func(c *gin.Context) {
@@ -72,34 +52,34 @@ func main() {
 
 		order, err := NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue)
 		if err != nil {
-			c.HTML(http.StatusInternalServerError, "error.html", gin.H{})
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 			return
 		}
 
-		println("new order", order)
-		orderBook.mu.Lock()
-		orderBook.OrderByID[order.ID] = order
-		//orderQueue <- order
-		orderBook.mu.Unlock()
+		err = saveOrderToDB(order)
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+			return
+		}
 
 		c.Redirect(http.StatusSeeOther, "/offer/"+order.ID)
 	})
 
 	router.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "trade.html", gin.H{
-			"IsDisabled": false,
-		})
+		c.HTML(http.StatusOK, "trade.html", gin.H{})
 	})
 
 	router.GET("/offer/:id", func(c *gin.Context) {
 		id := c.Params.ByName("id")
-		order, ok := orderBook.OrderByID[id]
-		if !ok {
-			c.HTML(http.StatusNotFound, "404.html", gin.H{})
+
+		order, err := fetchOrderFromDB(id)
+		if err != nil {
+			log.Println(err.Error())
+			c.HTML(http.StatusNotFound, "404.html", gin.H{"error": err.Error()})
 			return
 		}
 
-		err := watchForTrades(order, oceanURL)
+		err = watchForTrades(order, oceanURL)
 		if err != nil {
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 			return
@@ -145,92 +125,4 @@ func main() {
 	})
 
 	router.Run(":8080")
-}
-
-type Transaction struct {
-	TxID   string `json:"txid"`
-	Status struct {
-		Confirmed   bool   `json:"confirmed"`
-		BlockHeight int    `json:"block_height"`
-		BlockHash   string `json:"block_hash"`
-		BlockTime   int    `json:"block_time"`
-	} `json:"status"`
-}
-
-func fetchTransactionHistory(address string) ([]Transaction, error) {
-	apiURL := fmt.Sprintf("https://blockstream.info/liquidtestnet/api/address/%s/txs", address)
-
-	resp, err := http.Get(apiURL)
-	if err != nil {
-		fmt.Printf("Error fetching transaction history: %v\n", err)
-		return nil, err
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		fmt.Printf("Error reading response body: %v\n", err)
-		return nil, err
-	}
-
-	var transactions []Transaction
-	err = json.Unmarshal(body, &transactions)
-	if err != nil {
-		fmt.Printf("Error unmarshaling JSON: %v\n", err)
-		return nil, err
-	}
-
-	return transactions, nil
-}
-
-func fetchPrevout(txHash string, txIndex int) (*transaction.TxOutput, error) {
-	apiURL := fmt.Sprintf("https://blockstream.info/liquidtestnet/api/tx/%s/hex", txHash)
-
-	resp, err := http.Get(apiURL)
-	if err != nil {
-		fmt.Printf("Error fetching raw transaction: %v\n", err)
-		return nil, err
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		fmt.Printf("Error reading response body: %v\n", err)
-		return nil, err
-	}
-
-	tx, err := transaction.NewTxFromHex(string(body))
-	if err != nil {
-		fmt.Printf("Error creating transaction from hex: %v\n", err)
-		return nil, err
-	}
-
-	txOutput := tx.Outputs[txIndex]
-	return txOutput, nil
-}
-
-func fetchUnspents(address string) ([]*UTXO, error) {
-	apiURL := fmt.Sprintf("https://blockstream.info/liquidtestnet/api/address/%s/utxo", address)
-
-	resp, err := http.Get(apiURL)
-	if err != nil {
-		fmt.Printf("Error fetching UTXOs: %v\n", err)
-		return nil, err
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		fmt.Printf("Error reading response body: %v\n", err)
-		return nil, err
-	}
-
-	var utxos []*UTXO
-	err = json.Unmarshal(body, &utxos)
-	if err != nil {
-		fmt.Printf("Error unmarshaling JSON: %v\n", err)
-		return nil, err
-	}
-
-	return utxos, nil
 }
