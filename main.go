@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -120,18 +123,17 @@ func main() {
 		transactionHistory := make([]map[string]interface{}, len(transactions))
 		for i, tx := range transactions {
 			transactionHistory[i] = map[string]interface{}{
-				"Txid":      tx.TxID,
-				"TxidShort": tx.TxID[:6] + "..." + tx.TxID[len(tx.TxID)-6:],
-				"Confirmed": tx.Status.Confirmed,
-				"Date":      time.Unix(int64(tx.Status.BlockTime), 0).Format("2006-01-02 15:04:05"),
-				"BlockHash": tx.Status.BlockHash,
-				"BlockTime": tx.Status.BlockTime,
+				"txID":      tx.TxID,
+				"txIDShort": tx.TxID[:6] + "..." + tx.TxID[len(tx.TxID)-6:],
+				"confirmed": tx.Status.Confirmed,
+				"date":      time.Unix(int64(tx.Status.BlockTime), 0).Format("2006-01-02 15:04:05"),
 			}
 		}
 		inputCurrency := assetToCurrency[order.Input.Asset]
 		outputCurrency := assetToCurrency[order.Output.Asset]
 		date := order.Timestamp.Format("2006-01-02 15:04:05")
 		c.HTML(http.StatusOK, "offer.html", gin.H{
+			"id":             order.ID,
 			"address":        order.Address,
 			"inputValue":     order.InputValue(),
 			"inputCurrency":  inputCurrency,
@@ -143,6 +145,86 @@ func main() {
 			"status":         status,
 			"date":           date,
 		})
+	})
+
+	router.GET("/offer/:id/events", func(c *gin.Context) {
+		id := c.Params.ByName("id")
+		println("subscriber for " + id)
+
+		// Set the necessary headers for SSE
+		c.Writer.Header().Set("Content-Type", "text/event-stream")
+		c.Writer.Header().Set("Cache-Control", "no-cache")
+		c.Writer.Header().Set("Connection", "keep-alive")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// Create a new channel, over which we will send the events to the client
+		messageChan := make(chan string)
+
+		// Create a new goroutine
+		go func() {
+			for {
+				order, _, err := fetchOrderByID(id)
+				if err != nil {
+					log.Println(err.Error())
+					return
+				}
+
+				transactions, err := fetchTransactionHistory(order.Address)
+				if err != nil {
+					log.Println(err.Error())
+					return
+				}
+
+				transactionHistory := make([]map[string]interface{}, len(transactions))
+				for i, tx := range transactions {
+					transactionHistory[i] = map[string]interface{}{
+						"txID":      tx.TxID,
+						"txIDShort": tx.TxID[:6] + "..." + tx.TxID[len(tx.TxID)-6:],
+						"confirmed": tx.Status.Confirmed,
+						"date":      time.Unix(int64(tx.Status.BlockTime), 0).Format("2006-01-02 15:04:05"),
+					}
+				}
+
+				// Prepare the data
+				data := map[string]interface{}{
+					"transactions": transactionHistory,
+				}
+
+				// Create a new template
+				tmpl, err := template.ParseFiles("web/transactions.html")
+				if err != nil {
+					log.Println(err.Error())
+					return
+				}
+
+				// Execute the template with the data and write the result to a string
+				var html bytes.Buffer
+				if err := tmpl.Execute(&html, data); err != nil {
+					log.Println(err.Error())
+					return
+				}
+
+				htmlStr := strings.ReplaceAll(html.String(), "\n", " ")
+				// Send the HTML string to the client
+				messageChan <- htmlStr
+
+				// Sleep for 5 seconds
+				time.Sleep(3 * time.Second)
+			}
+		}()
+
+		// Create a loop that will continuously write new events to the stream
+		for {
+			select {
+			case html := <-messageChan:
+				// Write the HTML string to the response writer
+				c.Writer.Write([]byte(fmt.Sprintf("data: %v\n\n", html)))
+				c.Writer.Flush()
+			case <-c.Done():
+				// If the client has disconnected, we can stop sending events
+				return
+			}
+		}
 	})
 
 	router.GET("/login", func(c *gin.Context) {

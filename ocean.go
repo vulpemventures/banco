@@ -8,7 +8,6 @@ import (
 	"github.com/vulpemventures/go-elements/address"
 	"github.com/vulpemventures/go-elements/elementsutil"
 	"github.com/vulpemventures/go-elements/transaction"
-	oceanv1 "github.com/vulpemventures/ocean/api-spec/protobuf/gen/go/ocean/v1"
 	pb "github.com/vulpemventures/ocean/api-spec/protobuf/gen/go/ocean/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -65,8 +64,8 @@ type Utxo interface {
 	GetAssetBlinder() string
 	GetValueBlinder() string
 	GetAccountName() string
-	GetSpentStatus() *oceanv1.UtxoStatus
-	GetConfirmedStatus() *oceanv1.UtxoStatus
+	GetSpentStatus() *pb.UtxoStatus
+	GetConfirmedStatus() *pb.UtxoStatus
 	GetRedeemScript() string
 }
 

@@ -4,8 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wallet Transactions</title>
+    <title>Banco - Offer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.6.1"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 
@@ -16,9 +17,14 @@
                 <div>
                     <h2 class="text-2xl font-semibold mb-4">Offer Details</h2>
                     <div class="border-t border-gray-300 pt-4">
-                        <p class="text-gray-600">You send: {{.inputValue}} {{.inputCurrency}}</p>
-                        <p class="text-gray-600">You receive: {{.outputValue}} {{.outputCurrency}}</p>
-                        <hr />
+                        <p class="text-gray-600">
+                            You send
+                            <strong>{{.inputValue}} {{.inputCurrency}}</strong>
+                        </p>
+                        <p class="text-gray-600">
+                            You receive 
+                            <strong>{{.outputValue}} {{.outputCurrency}}</strong>
+                        </p>
                         <p class="text-gray-600">Status: {{.status}}</p>
                         <p class="text-gray-600"> Created: {{.date}}</p>
                     </div>
@@ -39,38 +45,8 @@
                     Pay with Marina
                 </button>
             </div>
-            <div>
-                <h2 class="text-2xl font-semibold mb-4">Transactions</h2>
-                {{if .transactions}}
-                <div class="unconfirmed-transactions">
-                    <h3 class="text-xl font-semibold mb-2">Pending</h3>
-                    {{range .transactions}}
-                    {{if not .Confirmed}}
-                    <div class="transaction-row">
-                        <p class="transaction-id">
-                            <a href="https://blockstream.info/liquidtestnet/tx/{{.Txid}}" target="_blank">🔗 {{.TxidShort}}</a>
-                        </p>
-                        <p class="block-time">📆 {{.Date}}</p>
-                    </div>
-                    {{end}}
-                    {{end}}
-                </div>
-                <div class="confirmed-transactions">
-                    <h3 class="text-xl font-semibold mb-2">Confirmed</h3>
-                    {{range .transactions}}
-                        {{if .Confirmed}}
-                        <div class="transaction-row">
-                            <p class="transaction-id">
-                                <a href="https://blockstream.info/liquidtestnet/tx/{{.Txid}}" target="_blank">🔗 {{.TxidShort}}</a>
-                            </p>
-                            <p class="block-time">📆 {{.Date}}</p>
-                        </div>
-                        {{end}}
-                    {{end}}
-                </div>
-                {{else}}
-                <p>No transactions yet! Make one from any wallet to fund the offer.</p>
-                {{end}}
+            <div hx-sse="connect:/offer/{{.id}}/events swap:message">
+                {{template "transactions.html" .}}
             </div>
         </div>
     </div>
@@ -78,11 +54,6 @@
     
     <script>
         async function payWithMarina() {
-            console.log({
-                address: "{{.address}}", // the address of the recipient
-                asset: "{{.inputAssetHash}}", // the asset to send
-                value: "{{.inputAmount}}" // amount always expressed in satoshis
-            })
             // Send 0.007 LBTC to an address
             const { txid, hex } = await window.marina.sendTransaction(
                 [

@@ -15,8 +15,6 @@ func startWatching(fn func(), watchInterval int) {
 }
 
 func watchForTrades(order *Order, oceanURL string) error {
-	log.Println("watching:", order.Address)
-	log.Println(time.Since(order.Timestamp), order.Timestamp)
 	if duration := time.Since(order.Timestamp); duration > 10*time.Minute {
 		err := updateOrderStatus(order.ID, "Expired")
 		if err != nil {
