@@ -228,13 +228,11 @@ func (t *Trade) ExecuteTrade() error {
 	if err != nil {
 		return fmt.Errorf("error in decoding base64: %w", err)
 	}
-	err = psetv2.Finalize(ptx, 1)
-	if err != nil {
-		return fmt.Errorf("error in finalize: %w", err)
-	}
-	err = psetv2.Finalize(ptx, 2)
-	if err != nil {
-		return fmt.Errorf("error in finalize: %w", err)
+	for i := 1; i < len(ptx.Inputs); i++ {
+		err = psetv2.Finalize(ptx, i)
+		if err != nil {
+			return fmt.Errorf("error in finalize: %w", err)
+		}
 	}
 
 	// Manually setting the FinalScriptWitness into the unsigned tx
@@ -278,8 +276,14 @@ func (t *Trade) ExecuteTrade() error {
 	}
 	ptx.Inputs[0].FinalScriptWitness = serializer.Bytes()
 
+	utx, err := ptx.UnsignedTx()
+	if err != nil {
+		return fmt.Errorf("error in accessing the unsigned tx: %w", err)
+	}
+
 	finalTx, err := psetv2.Extract(ptx)
 	if err != nil {
+		log.Println(utx.ToHex())
 		return fmt.Errorf("error in extracting to tx hex: %w", err)
 	}
 

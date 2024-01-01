@@ -40,24 +40,26 @@
           <div class="text-right text-sm">~ 18000 EUR</div>
 
           <!-- Submit Button -->
-          <button disabled type="submit" id="tradeButton" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+          <button disabled type="submit" id="tradeButton"
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
             Connect
           </button>
         </div>
       </form>
     </div>
   </div>
-  <button id="connectButton" onclick="connectMarina()" class="absolute top-0 right-0 m-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+  <button id="connectButton" onclick="connectMarina()"
+    class="absolute top-0 right-0 m-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
     Connect with Marina
   </button>
 </body>
 <script src="https://unpkg.com/htmx.org"></script>
 <script>
-  window.onload = async function() {
+  window.onload = async function () {
     const isEnabled = await window.marina.isEnabled();
     const traderScript = localStorage.getItem('traderScript')
 
-    if (isEnabled && traderScript) 
+    if (isEnabled && traderScript)
       updateViewAfterConnect(traderScript);
   }
 
@@ -68,40 +70,66 @@
       // Ask user for permissions
       await window.marina.enable();
 
-      // fetch his address and script to receive funds
-      const { script } = await window.marina.getNextAddress();
+      const addresses = await window.marina.getAddresses();
 
-      // updated view
-      updateViewAfterConnect(script);
+      if (addresses.length === 0) {
+        const { script } = await window.marina.getNextAddress();
+        // updated view
+        updateViewAfterConnect(script);
 
-      // persist state
-      localStorage.setItem('traderScript', script);
+        // persist state
+        localStorage.setItem('traderScript', script);
+      } else {
+        const derivationPath = "m/0/0";
+        let firstAddress;
+
+        for (const address of addresses) {
+          if (address.derivationPath === derivationPath) {
+            firstAddress = address;
+            break;
+          }
+        }
+
+        if (firstAddress) {
+          const { script, unconfidentialAddress } = firstAddress;
+
+          // updated view
+          updateViewAfterConnect(script);
+
+          // persist state
+          localStorage.setItem('traderScript', script);
+        } else {
+          console.error('No address found with the derivation path', derivationPath);
+        }
+      }
+
     } catch (error) {
       console.error(error);
     }
   }
 
   function updateViewAfterConnect(script) {
-     // Update buttons title
-     const connectButton = document.getElementById('connectButton');
-      const tradeButton = document.getElementById('tradeButton');
-      connectButton.innerText = 'Connected';
-      tradeButton.innerText = 'Trade';
+    // Update buttons title
+    const connectButton = document.getElementById('connectButton');
+    const tradeButton = document.getElementById('tradeButton');
+    connectButton.innerText = 'Connected';
+    tradeButton.innerText = 'Trade';
 
-      // Enable/disable buttons
-      connectButton.disabled = true;
-      tradeButton.disabled = false;
+    // Enable/disable buttons
+    connectButton.disabled = true;
+    tradeButton.disabled = false;
 
-      // Attach script taken from Marina step when Trade submit button is clicked
-      tradeButton.addEventListener('click', function() {
-        // Attach the script to the form submission
-        const form = document.querySelector('form');
-        const scriptInput = document.createElement('input');
-        scriptInput.type = 'hidden';
-        scriptInput.name = 'traderScript';
-        scriptInput.value = script;
-        form.appendChild(scriptInput);
-      });
+    // Attach script taken from Marina step when Trade submit button is clicked
+    tradeButton.addEventListener('click', function () {
+      // Attach the script to the form submission
+      const form = document.querySelector('form');
+      const scriptInput = document.createElement('input');
+      scriptInput.type = 'hidden';
+      scriptInput.name = 'traderScript';
+      scriptInput.value = script;
+      form.appendChild(scriptInput);
+    });
   }
 </script>
+
 </html>

@@ -48,8 +48,8 @@ func main() {
 				log.Fatalln("error in fetchPendingOrders", err)
 			}
 
-			log.Println("Pending orders", len(orders))
 			for _, order := range orders {
+				log.Println("new pending order", order.ID)
 				err = watchForTrades(order, oceanURL)
 				if err != nil {
 					log.Println(fmt.Errorf("error in fulfilling order with ID %s: %v", order.ID, err))
@@ -132,6 +132,7 @@ func main() {
 		inputCurrency := assetToCurrency[order.Input.Asset]
 		outputCurrency := assetToCurrency[order.Output.Asset]
 		date := order.Timestamp.Format("2006-01-02 15:04:05")
+		println(status)
 		c.HTML(http.StatusOK, "offer.html", gin.H{
 			"id":             order.ID,
 			"address":        order.Address,
@@ -163,7 +164,7 @@ func main() {
 		// Create a new goroutine
 		go func() {
 			for {
-				order, _, err := fetchOrderByID(id)
+				order, status, err := fetchOrderByID(id)
 				if err != nil {
 					log.Println(err.Error())
 					return
@@ -187,6 +188,7 @@ func main() {
 
 				// Prepare the data
 				data := map[string]interface{}{
+					"status":       status,
 					"transactions": transactionHistory,
 				}
 
@@ -205,10 +207,7 @@ func main() {
 				}
 
 				htmlStr := strings.ReplaceAll(html.String(), "\n", " ")
-				// Send the HTML string to the client
 				messageChan <- htmlStr
-
-				// Sleep for 5 seconds
 				time.Sleep(3 * time.Second)
 			}
 		}()
@@ -226,6 +225,15 @@ func main() {
 			}
 		}
 	})
+
+	/* router.POST("/connect", func(c *gin.Context) {
+		// Handle the connection request here
+		// You can perform any necessary validation or processing
+		address := c.PostForm("address")
+
+		// Return the HTML directly as a string
+		c.String(http.StatusOK, `<button id="connectButton">Connected</button>`)
+	}) */
 
 	router.GET("/login", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "login.html", gin.H{})
