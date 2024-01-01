@@ -155,17 +155,22 @@ func (t *Trade) PrepareFulfillTransaction(
 		}})
 	}
 
-	if changeProviderAmountOfFees > FEE_AMOUNT {
-		updater.AddOutputs([]psetv2.OutputArgs{{
-			Asset:  currencyToAsset["tL-BTC"].AssetHash,
-			Amount: changeProviderAmountOfFees,
-			Script: changeProviderScriptOfFees,
-		}})
+	feeAmountWithoutCreatingDust := uint64(FEE_AMOUNT)
+	if changeProviderAmountOfFees > 0 {
+		if changeProviderAmountOfFees < FEE_AMOUNT {
+			feeAmountWithoutCreatingDust = uint64(FEE_AMOUNT) + changeProviderAmountOfFees
+		} else {
+			updater.AddOutputs([]psetv2.OutputArgs{{
+				Asset:  currencyToAsset["tL-BTC"].AssetHash,
+				Amount: changeProviderAmountOfFees,
+				Script: changeProviderScriptOfFees,
+			}})
+		}
 	}
 
 	updater.AddOutputs([]psetv2.OutputArgs{{
 		Asset:  currencyToAsset["tL-BTC"].AssetHash,
-		Amount: FEE_AMOUNT,
+		Amount: feeAmountWithoutCreatingDust,
 	}})
 
 	return ptx, nil

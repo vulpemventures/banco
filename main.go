@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -28,14 +29,31 @@ func main() {
 		}
 	}
 
-	if watchInterval > 0 {
-		// start watching
-		log.Println("Watcher not implemented yet")
-	}
-
+	// DB
 	_, err := initDB()
 	if err != nil {
 		log.Fatal("connectToDB: ", err)
+	}
+
+	// Start processing pending trades
+	if watchInterval > 0 {
+		// start watching
+		log.Println("Watcher service started")
+		go startWatching(func() {
+			orders, err := fetchOrdersToFulfill()
+			if err != nil {
+				log.Fatalln("error in fetchPendingOrders", err)
+			}
+
+			log.Println("Pending orders", len(orders))
+			for _, order := range orders {
+				err = watchForTrades(order, oceanURL)
+				if err != nil {
+					log.Println(fmt.Errorf("error in fulfilling order with ID %s: %v", order.ID, err))
+				}
+			}
+
+		}, watchInterval)
 	}
 
 	router := gin.Default()
@@ -56,7 +74,7 @@ func main() {
 			return
 		}
 
-		err = saveOrderToDB(order)
+		err = saveOrder(order)
 		if err != nil {
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 			return
@@ -69,19 +87,26 @@ func main() {
 		c.HTML(http.StatusOK, "trade.html", gin.H{})
 	})
 
-	router.GET("/offer/:id", func(c *gin.Context) {
-		id := c.Params.ByName("id")
+	router.GET("/offer/address/:address", func(c *gin.Context) {
+		addr := c.Params.ByName("address")
 
-		order, err := fetchOrderFromDB(id)
+		ID, err := fetchOrderIDByAddress(addr)
 		if err != nil {
 			log.Println(err.Error())
 			c.HTML(http.StatusNotFound, "404.html", gin.H{"error": err.Error()})
 			return
 		}
 
-		err = watchForTrades(order, oceanURL)
+		c.Redirect(http.StatusSeeOther, "/offer/"+ID)
+	})
+
+	router.GET("/offer/:id", func(c *gin.Context) {
+		id := c.Params.ByName("id")
+
+		order, status, err := fetchOrderByID(id)
 		if err != nil {
-			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+			log.Println(err.Error())
+			c.HTML(http.StatusNotFound, "404.html", gin.H{"error": err.Error()})
 			return
 		}
 
@@ -90,8 +115,6 @@ func main() {
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{})
 			return
 		}
-
-		println("fetched txs", len(transactions))
 
 		// manipulate template data and render page
 		transactionHistory := make([]map[string]interface{}, len(transactions))
@@ -107,7 +130,7 @@ func main() {
 		}
 		inputCurrency := assetToCurrency[order.Input.Asset]
 		outputCurrency := assetToCurrency[order.Output.Asset]
-
+		date := order.Timestamp.Format("2006-01-02 15:04:05")
 		c.HTML(http.StatusOK, "offer.html", gin.H{
 			"address":        order.Address,
 			"inputValue":     order.InputValue(),
@@ -117,6 +140,8 @@ func main() {
 			"transactions":   transactionHistory,
 			"inputAssetHash": order.Input.Asset,
 			"inputAmount":    order.Input.Amount,
+			"status":         status,
+			"date":           date,
 		})
 	})
 

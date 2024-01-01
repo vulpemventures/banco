@@ -16,14 +16,22 @@ func startWatching(fn func(), watchInterval int) {
 
 func watchForTrades(order *Order, oceanURL string) error {
 	log.Println("watching:", order.Address)
+	log.Println(time.Since(order.Timestamp), order.Timestamp)
+	if duration := time.Since(order.Timestamp); duration > 10*time.Minute {
+		err := updateOrderStatus(order.ID, "Expired")
+		if err != nil {
+			log.Println("error updating order status:", err)
+		}
+	}
+
 	utxos, err := fetchUnspents(order.Address)
 	if err != nil {
 		return fmt.Errorf("error fetching unspents: %w", err)
 	}
 
-	log.Println(utxos, order.Input.Amount)
 	if coinsAreMoreThan(utxos, order.Input.Amount) {
-		// Execute the trade
+		updateOrderStatus(order.ID, "Funded")
+
 		trades, err := executeTrades(
 			order,
 			utxos,
@@ -32,7 +40,12 @@ func watchForTrades(order *Order, oceanURL string) error {
 		if err != nil {
 			return fmt.Errorf("error executing trade: %v", err)
 		}
-		log.Println("executed trades:", trades)
+
+		for _, trade := range trades {
+			log.Printf("Executed trade for order ID: %s\n", trade.Order.ID)
+		}
+
+		updateOrderStatus(order.ID, "Fulfilled")
 	}
 	return nil
 }
