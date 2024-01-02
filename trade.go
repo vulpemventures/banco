@@ -295,7 +295,7 @@ func (t *Trade) ExecuteTrade() error {
 	// Broadcast the transaction
 	txid, err := t.walletService.BroadcastTransaction(context.Background(), txHex)
 	if err != nil {
-		println(txHex)
+		log.Println(txHex)
 		return fmt.Errorf("error in broadcasting transaction: %w", err)
 	}
 	if len(txid) > 0 {

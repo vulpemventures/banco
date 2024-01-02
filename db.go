@@ -177,7 +177,13 @@ func fetchOrdersToFulfill() ([]*Order, error) {
 		var order OrderAndStatusRow
 		err := rows.Scan(&order.ID, &order.Timestamp, &order.FulfillScript, &order.RefundScript, &order.TraderScript, &order.InputAsset, &order.InputAmount, &order.OutputAsset, &order.OutputAmount, &order.Address)
 		if err != nil {
-			return nil, err
+			if err == sql.ErrNoRows {
+				// Handle no rows in result set, for example by returning an empty slice
+				return []*Order{}, nil
+			} else {
+				// Handle other errors
+				return nil, err
+			}
 		}
 
 		timestamp, err := time.Parse("2006-01-02 15:04:05", order.Timestamp)

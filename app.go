@@ -6,19 +6,11 @@ import (
 	"time"
 )
 
-func startWatching(fn func(), watchInterval int) {
-	for {
-		fn()
-		// Wait for a defined interval before polling again
-		time.Sleep(time.Duration(watchInterval) * time.Second)
-	}
-}
-
 func watchForTrades(order *Order, oceanURL string) error {
 	if duration := time.Since(order.Timestamp); duration > 10*time.Minute {
 		err := updateOrderStatus(order.ID, "Expired")
 		if err != nil {
-			log.Println("error updating order status:", err)
+			return fmt.Errorf("error updating order status: %w", err)
 		}
 	}
 
@@ -27,6 +19,7 @@ func watchForTrades(order *Order, oceanURL string) error {
 		return fmt.Errorf("error fetching unspents: %w", err)
 	}
 
+	// TODO Check also the asset type
 	if coinsAreMoreThan(utxos, order.Input.Amount) {
 		updateOrderStatus(order.ID, "Funded")
 
@@ -40,7 +33,7 @@ func watchForTrades(order *Order, oceanURL string) error {
 		}
 
 		for _, trade := range trades {
-			log.Printf("Executed trade for order ID: %s\n", trade.Order.ID)
+			log.Printf("executed trade for order ID: %s\n", trade.Order.ID)
 		}
 
 		updateOrderStatus(order.ID, "Fulfilled")

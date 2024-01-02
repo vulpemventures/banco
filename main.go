@@ -41,18 +41,18 @@ func main() {
 	// Start processing pending trades
 	if watchInterval > 0 {
 		// start watching
-		log.Println("Watcher service started")
 		go startWatching(func() {
 			orders, err := fetchOrdersToFulfill()
 			if err != nil {
-				log.Fatalln("error in fetchPendingOrders", err)
+				log.Println("error in fetchPendingOrders", err)
+				return
 			}
-
+			log.Println("Pending orders", len(orders))
 			for _, order := range orders {
-				log.Println("new pending order", order.ID)
 				err = watchForTrades(order, oceanURL)
 				if err != nil {
 					log.Println(fmt.Errorf("error in fulfilling order with ID %s: %v", order.ID, err))
+					continue
 				}
 			}
 
@@ -62,18 +62,23 @@ func main() {
 	router := gin.Default()
 	router.LoadHTMLGlob("web/*")
 
-	router.POST("/api/offer", func(c *gin.Context) {
+	// API
+	router.POST("/trade", func(c *gin.Context) {
 
 		// Extract values from the request
-		inputValue := c.PostForm("input")
-		outputValue := c.PostForm("output")
+		inputValue := c.PostForm("inputValue")
+		outputValue := c.PostForm("outputValue")
 		inputCurrency := c.PostForm("inputCurrency")
 		outputCurrency := c.PostForm("outputCurrency")
 		traderScriptHex := c.PostForm("traderScript")
+		if inputValue == "" || outputValue == "" || inputCurrency == "" || outputCurrency == "" || traderScriptHex == "" {
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{"error": "missing form data"})
+			return
+		}
 
 		order, err := NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue)
 		if err != nil {
-			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+			c.HTML(http.StatusInternalServerError, "404.html", gin.H{"error": err.Error()})
 			return
 		}
 
@@ -86,8 +91,47 @@ func main() {
 		c.Redirect(http.StatusSeeOther, "/offer/"+order.ID)
 	})
 
+	router.GET("/trade/preview", func(c *gin.Context) {
+		inputCurrency := c.Query("inputCurrency")
+		outputCurrency := c.Query("outputCurrency")
+		inputValue := c.Query("inputValue")
+		outputValue := c.Query("outputValue")
+
+		if inputCurrency == "" || outputCurrency == "" {
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{"error": "Missing inputCurrency or outputCurrency parameter"})
+			return
+		}
+
+		rate, err := getConversionRate(inputCurrency, outputCurrency)
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+			return
+		}
+
+		var html string
+
+		if inputValue != "" {
+			floatValue, _ := strconv.ParseFloat(inputValue, 64)
+			outputValue = fmt.Sprintf("%.2f", floatValue*rate)
+			html = fmt.Sprintf(`<input type="text" name="outputValue" value="%s" class="text-right font-semibold bg-transparent outline-none">`, outputValue)
+		} else if outputValue != "" {
+			floatValue, _ := strconv.ParseFloat(outputValue, 64)
+			inputValue = fmt.Sprintf("%.2f", floatValue/rate)
+			html = fmt.Sprintf(`<input type="text" name="inputValue" value="%s" class="text-right font-semibold bg-transparent outline-none">`, inputValue)
+		} else {
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{"error": "Missing inputValue or outputValue parameter"})
+			return
+		}
+
+		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+	})
+
+	// Web
 	router.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "trade.html", gin.H{})
+		c.HTML(http.StatusOK, "trade.html", gin.H{
+			"inputAssets":  tradableAssets("USDT"),
+			"outputAssets": tradableAssets("FUSD"),
+		})
 	})
 
 	router.GET("/offer/address/:address", func(c *gin.Context) {
@@ -132,7 +176,6 @@ func main() {
 		inputCurrency := assetToCurrency[order.Input.Asset]
 		outputCurrency := assetToCurrency[order.Output.Asset]
 		date := order.Timestamp.Format("2006-01-02 15:04:05")
-		println(status)
 		c.HTML(http.StatusOK, "offer.html", gin.H{
 			"id":             order.ID,
 			"address":        order.Address,
@@ -150,7 +193,6 @@ func main() {
 
 	router.GET("/offer/:id/events", func(c *gin.Context) {
 		id := c.Params.ByName("id")
-		println("subscriber for " + id)
 
 		// Set the necessary headers for SSE
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -166,14 +208,14 @@ func main() {
 			for {
 				order, status, err := fetchOrderByID(id)
 				if err != nil {
-					log.Println(err.Error())
-					return
+					log.Println("error fetching order by ID:", err)
+					continue
 				}
 
 				transactions, err := fetchTransactionHistory(order.Address)
 				if err != nil {
-					log.Println(err.Error())
-					return
+					log.Println("Error fetching transaction history:", err)
+					continue
 				}
 
 				transactionHistory := make([]map[string]interface{}, len(transactions))
@@ -240,4 +282,12 @@ func main() {
 	})
 
 	router.Run(":8080")
+}
+
+func startWatching(fn func(), watchInterval int) {
+	for {
+		fn()
+		// Wait for a defined interval before polling again
+		time.Sleep(time.Duration(watchInterval) * time.Second)
+	}
 }

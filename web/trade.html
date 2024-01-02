@@ -7,22 +7,21 @@
   <title>Banco Exchange</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-
 <body class="bg-white text-gray-800">
   <div class="min-h-screen flex items-center justify-center">
     <div class="max-w-lg mx-auto p-8">
-      <form action="/api/offer" method="POST">
+      <form action="/trade" method="POST">
         <div class="grid gap-4">
-          <!-- Currency Input -->
           <div class="flex items-center justify-between p-4 border-2 border-gray-300 rounded-md">
-            <span class="font-semibold" value="FUSD">FUSD</span>
-            <input type="hidden" name="inputCurrency" id="inputCurrency" value="FUSD">
-            <input type="text" name="input" placeholder="0.0"
-              class="text-right font-semibold bg-transparent outline-none">
+            <select id="inputCurrency" name="inputCurrency">
+              {{range .inputAssets}}
+              <option value="{{.Ticker}}">{{.Ticker}} - {{.Name}}</option>
+              {{end}}
+            </select>
+            <input type="text" name="inputValue" class="text-right font-semibold bg-transparent outline-none">
           </div>
-          <div class="text-right text-sgom">~ 18750 EUR</div>
+          <div class="text-right text-sm">~ 18750 EUR</div>
 
-          <!-- Arrow Down -->
           <div class="flex justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24"
               stroke="currentColor">
@@ -30,38 +29,72 @@
             </svg>
           </div>
 
-          <!-- Currency Output -->
           <div class="flex items-center justify-between p-4 border-2 border-gray-300 rounded-md">
-            <span class="font-semibold" value="USDT">USDT</span>
-            <input type="hidden" name="outputCurrency" id="outputCurrency" value="USDT">
-            <input type="text" name="output" placeholder="0.0"
-              class="text-right font-semibold bg-transparent outline-none">
+            <select id="outputCurrency" name="outputCurrency">
+              {{range .outputAssets}}
+              <option value="{{.Ticker}}">{{.Ticker}} - {{.Name}}</option>
+              {{end}}
+            </select>
+            <input type="text" name="outputValue" class="text-right font-semibold bg-transparent outline-none">
           </div>
           <div class="text-right text-sm">~ 18000 EUR</div>
-
-          <!-- Submit Button -->
-          <button disabled type="submit" id="tradeButton"
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-            Connect
-          </button>
         </div>
+        <div class="border border-gray-300 rounded-md p-4 mt-4 mb-2">
+          <div class="mb-4">
+            <label for="traderAddress" class="block text-sm font-medium text-gray-700">Receive at Address</label>
+            <input type="text" name="traderAddress" id="traderAddress" onchange="onInputChange()"
+              class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" placeholder="ex1..." />
+          </div>
+          <div class="mb-4 text-center" id="orText">or</div>
+          <div class="mb-4">
+            <button type="button" id="connectButton" onclick="connectMarina()"
+              class="w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm">Connect with
+              Marina</button>
+          </div>
+        </div>
+        <button disabled type="submit" id="tradeButton"
+            class="w-full px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm">Trade</button>
       </form>
     </div>
   </div>
-  <button id="connectButton" onclick="connectMarina()"
-    class="absolute top-0 right-0 m-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-    Connect with Marina
-  </button>
 </body>
 <script src="https://unpkg.com/htmx.org"></script>
 <script>
   window.onload = async function () {
     const isEnabled = await window.marina.isEnabled();
     const traderScript = localStorage.getItem('traderScript')
+    const traderAddress = localStorage.getItem('traderAddress')
 
-    if (isEnabled && traderScript)
-      updateViewAfterConnect(traderScript);
+    if (isEnabled && traderScript && traderAddress)
+      updateViewAfterConnect(traderScript, traderAddress);
   }
+
+  async function onInputChange() {
+    const input = document.getElementById('traderAddress')
+    const traderAddress = input.value;
+    const traderScript = input.value;
+
+    if (!traderAddress) return;
+    
+    updateViewAfterConnect(traderScript, traderAddress);
+  
+    localStorage.setItem('traderScript', input.value);
+    localStorage.setItem('traderAddress', input.value);
+  }
+
+  function updateHxGet() {
+    var inputCurrency = document.querySelector("#inputCurrency").value;
+    var outputCurrency = document.querySelector("#outputCurrency").value;
+    var inputValue = document.querySelector("input[name=inputValue]").value;
+    var outputValue = document.querySelector("input[name=outputValue]").value;
+
+    var url = "/trade/preview?inputCurrency=" + encodeURIComponent(inputCurrency) + "&outputCurrency=" + encodeURIComponent(outputCurrency) + "&inputValue=" + encodeURIComponent(inputValue) + "&outputValue=" + encodeURIComponent(outputValue);
+
+    document.querySelector("#inputCurrency").setAttribute("hx-get", url);
+    document.querySelector("input[name=inputValue]").setAttribute("hx-get", url);
+    document.querySelector("#outputCurrency").setAttribute("hx-get", url);
+    document.querySelector("input[name=outputValue]").setAttribute("hx-get", url);
+}
 
   async function connectMarina() {
     try {
@@ -73,12 +106,13 @@
       const addresses = await window.marina.getAddresses();
 
       if (addresses.length === 0) {
-        const { script } = await window.marina.getNextAddress();
+        const { script, unconfidentialAddress } = await window.marina.getNextAddress();
         // updated view
-        updateViewAfterConnect(script);
+        updateViewAfterConnect(script, unconfidentialAddress);
 
         // persist state
         localStorage.setItem('traderScript', script);
+        localStorage.setItem('traderAddress', unconfidentialAddress);
       } else {
         const derivationPath = "m/0/0";
         let firstAddress;
@@ -90,45 +124,46 @@
           }
         }
 
-        if (firstAddress) {
-          const { script, unconfidentialAddress } = firstAddress;
+        const { script, unconfidentialAddress } = firstAddress;
+        // updated view
+        updateViewAfterConnect(script, unconfidentialAddress);
 
-          // updated view
-          updateViewAfterConnect(script);
-
-          // persist state
-          localStorage.setItem('traderScript', script);
-        } else {
-          console.error('No address found with the derivation path', derivationPath);
-        }
+        // persist state
+        localStorage.setItem('traderScript', script);
+        localStorage.setItem('traderAddress', unconfidentialAddress);
       }
-
     } catch (error) {
       console.error(error);
     }
   }
 
-  function updateViewAfterConnect(script) {
-    // Update buttons title
+  function updateViewAfterConnect(script, address) {
+    // update the Liquid address input
+    const traderInput = document.getElementById('traderAddress');
+    traderInput.value = address;
+    traderInput.disabled = true;
+
+    // Update form buttons and texts
     const connectButton = document.getElementById('connectButton');
     const tradeButton = document.getElementById('tradeButton');
-    connectButton.innerText = 'Connected';
-    tradeButton.innerText = 'Trade';
+    const orText = document.getElementById('orText');
 
-    // Enable/disable buttons
-    connectButton.disabled = true;
+    tradeButton.innerText = 'Trade';    
     tradeButton.disabled = false;
 
+    orText.style.display = 'none';
+
+    connectButton.style.display = 'none';
+
     // Attach script taken from Marina step when Trade submit button is clicked
-    tradeButton.addEventListener('click', function () {
-      // Attach the script to the form submission
-      const form = document.querySelector('form');
-      const scriptInput = document.createElement('input');
-      scriptInput.type = 'hidden';
-      scriptInput.name = 'traderScript';
-      scriptInput.value = script;
-      form.appendChild(scriptInput);
-    });
+    // Attach the script to the form submission
+    const scriptInput = document.createElement('input');
+    scriptInput.type = 'hidden';
+    scriptInput.name = 'traderScript';
+    scriptInput.value = script;
+
+    const form = document.querySelector('form');
+    form.appendChild(scriptInput);
   }
 </script>
 
