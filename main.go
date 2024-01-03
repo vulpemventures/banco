@@ -63,7 +63,7 @@ func main() {
 	router.LoadHTMLGlob("web/*")
 
 	// API
-	router.POST("/trade", func(c *gin.Context) {
+	router.POST("/api/trade", func(c *gin.Context) {
 
 		// Extract values from the request
 		inputValue := c.PostForm("inputValue")
@@ -78,7 +78,7 @@ func main() {
 
 		order, err := NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue)
 		if err != nil {
-			c.HTML(http.StatusInternalServerError, "404.html", gin.H{"error": err.Error()})
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 			return
 		}
 
@@ -89,41 +89,6 @@ func main() {
 		}
 
 		c.Redirect(http.StatusSeeOther, "/offer/"+order.ID)
-	})
-
-	router.GET("/trade/preview", func(c *gin.Context) {
-		inputCurrency := c.Query("inputCurrency")
-		outputCurrency := c.Query("outputCurrency")
-		inputValue := c.Query("inputValue")
-		outputValue := c.Query("outputValue")
-
-		if inputCurrency == "" || outputCurrency == "" {
-			c.HTML(http.StatusBadRequest, "error.html", gin.H{"error": "Missing inputCurrency or outputCurrency parameter"})
-			return
-		}
-
-		rate, err := getConversionRate(inputCurrency, outputCurrency)
-		if err != nil {
-			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
-			return
-		}
-
-		var html string
-
-		if inputValue != "" {
-			floatValue, _ := strconv.ParseFloat(inputValue, 64)
-			outputValue = fmt.Sprintf("%.2f", floatValue*rate)
-			html = fmt.Sprintf(`<input type="text" name="outputValue" value="%s" class="text-right font-semibold bg-transparent outline-none">`, outputValue)
-		} else if outputValue != "" {
-			floatValue, _ := strconv.ParseFloat(outputValue, 64)
-			inputValue = fmt.Sprintf("%.2f", floatValue/rate)
-			html = fmt.Sprintf(`<input type="text" name="inputValue" value="%s" class="text-right font-semibold bg-transparent outline-none">`, inputValue)
-		} else {
-			c.HTML(http.StatusBadRequest, "error.html", gin.H{"error": "Missing inputValue or outputValue parameter"})
-			return
-		}
-
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 	})
 
 	// Web
@@ -268,17 +233,43 @@ func main() {
 		}
 	})
 
-	/* router.POST("/connect", func(c *gin.Context) {
-		// Handle the connection request here
-		// You can perform any necessary validation or processing
-		address := c.PostForm("address")
+	router.GET("/rate", func(c *gin.Context) {
+		// Set the necessary headers for SSE
+		c.Writer.Header().Set("Content-Type", "text/event-stream")
+		c.Writer.Header().Set("Cache-Control", "no-cache")
+		c.Writer.Header().Set("Connection", "keep-alive")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
-		// Return the HTML directly as a string
-		c.String(http.StatusOK, `<button id="connectButton">Connected</button>`)
-	}) */
+		// Create a channel to send rates
+		rateChan := make(chan string)
+		// Start a goroutine to generate rates
+		go func() {
+			for {
+				input := "tL-BTC"
+				output := "USDT"
+				rate, err := getConversionRate(input, output)
+				if err != nil {
+					rateChan <- fmt.Sprintf("<div>Error: %v</div>", err)
+				} else {
+					rateChan <- fmt.Sprintf("<div>~ %f %s</div>", rate, output)
+				}
 
-	router.GET("/login", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "login.html", gin.H{})
+				time.Sleep(1 * time.Minute)
+			}
+		}()
+
+		for {
+			select {
+			case rate := <-rateChan:
+				// Write the HTML string to the response writer
+				c.Writer.Write([]byte(fmt.Sprintf("data: %v\n\n", rate)))
+				c.Writer.Flush()
+			case <-c.Done():
+				// If the client has disconnected, we can stop sending events
+				return
+			}
+		}
+
 	})
 
 	router.Run(":8080")

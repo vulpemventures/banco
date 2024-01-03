@@ -6,11 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Banco Exchange</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org"></script>
 </head>
 <body class="bg-white text-gray-800">
   <div class="min-h-screen flex items-center justify-center">
     <div class="max-w-lg mx-auto p-8">
-      <form action="/trade" method="POST">
+      <form action="/api/trade" method="POST">
         <div class="grid gap-4">
           <div class="flex items-center justify-between p-4 border-2 border-gray-300 rounded-md">
             <select id="inputCurrency" name="inputCurrency">
@@ -20,7 +21,9 @@
             </select>
             <input type="text" name="inputValue" class="text-right font-semibold bg-transparent outline-none">
           </div>
-          <div class="text-right text-sm">~ 18750 EUR</div>
+          <div class="text-right text-sm" hx-sse="connect:/rate?input=tL-BTC&output=USDT swap:message">
+            Loading...
+          </div>
 
           <div class="flex justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24"
@@ -37,7 +40,9 @@
             </select>
             <input type="text" name="outputValue" class="text-right font-semibold bg-transparent outline-none">
           </div>
-          <div class="text-right text-sm">~ 18000 EUR</div>
+          <div class="text-right text-sm" hx-sse="connect:/rate?input=tL-BTC&output=USDT swap:message">
+            Loading...
+          </div>
         </div>
         <div class="border border-gray-300 rounded-md p-4 mt-4 mb-2">
           <div class="mb-4">
@@ -81,20 +86,6 @@
     localStorage.setItem('traderScript', input.value);
     localStorage.setItem('traderAddress', input.value);
   }
-
-  function updateHxGet() {
-    var inputCurrency = document.querySelector("#inputCurrency").value;
-    var outputCurrency = document.querySelector("#outputCurrency").value;
-    var inputValue = document.querySelector("input[name=inputValue]").value;
-    var outputValue = document.querySelector("input[name=outputValue]").value;
-
-    var url = "/trade/preview?inputCurrency=" + encodeURIComponent(inputCurrency) + "&outputCurrency=" + encodeURIComponent(outputCurrency) + "&inputValue=" + encodeURIComponent(inputValue) + "&outputValue=" + encodeURIComponent(outputValue);
-
-    document.querySelector("#inputCurrency").setAttribute("hx-get", url);
-    document.querySelector("input[name=inputValue]").setAttribute("hx-get", url);
-    document.querySelector("#outputCurrency").setAttribute("hx-get", url);
-    document.querySelector("input[name=outputValue]").setAttribute("hx-get", url);
-}
 
   async function connectMarina() {
     try {

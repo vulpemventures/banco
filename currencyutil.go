@@ -7,6 +7,12 @@ type Asset struct {
 	Name      string
 }
 
+var currencyToSymbol = map[string]string{
+	"USDT":   "USD",
+	"FUSD":   "USD",
+	"tL-BTC": "BTC",
+}
+
 var currencyToAsset = map[string]Asset{
 	"FUSD":   {"0d86b2f6a8c3b02a8c7c8836b83a081e68b7e2b4bcdfc58981fc5486f59f7518", 8, "FUSD", "Fuji USD"},
 	"USDT":   {"f3d1ec678811398cd2ae277cbe3849c6f6dbd72c74bc542f7c4b11ff0e820958", 8, "USDT", "Tether USD"},

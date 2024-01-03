@@ -38,6 +38,7 @@ require (
 )
 
 require (
+	github.com/JulianToledano/goingecko v1.0.1
 	github.com/btcsuite/btcd v0.23.4
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/bytedance/sonic v1.9.1 // indirect
