@@ -85,7 +85,6 @@ func fetchConversionRate() (float64, error) {
 		return 0, err
 	}
 
-	println(result.LastPrice)
 	rate, err := strconv.ParseFloat(result.LastPrice, 64)
 	if err != nil {
 		return 0, err

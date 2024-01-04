@@ -104,9 +104,11 @@
   async function onConnectInputChange() {
     const input = document.getElementById('traderAddress')
     const traderAddress = input.value;
-    const traderScript = input.value;
-
+    
     if (!traderAddress) return;
+
+    const response = await fetch(`/address-to-script/${traderAddress}`);
+    const traderScript = await response.text();
 
     updateViewAfterConnect(traderScript, traderAddress);
 

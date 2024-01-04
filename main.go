@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"html/template"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/vulpemventures/go-elements/address"
 	_ "modernc.org/sqlite"
 )
 
@@ -321,6 +323,24 @@ func main() {
 				return
 			}
 		}
+	})
+
+	router.GET("/address-to-script/:address", func(c *gin.Context) {
+		// Extract the address from the URL parameter
+		addr := c.Param("address")
+
+		// Decode the address using go-elements
+		script, err := address.ToOutputScript(addr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid address"})
+			return
+		}
+
+		// Convert the script to a hex string
+		scriptHex := hex.EncodeToString(script)
+
+		// Return the scriptHex as a string
+		c.String(http.StatusOK, scriptHex)
 	})
 
 	router.Run(":8080")
