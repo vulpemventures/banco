@@ -161,7 +161,7 @@ func (t *Trade) PrepareFulfillTransaction(
 			feeAmountWithoutCreatingDust = uint64(FEE_AMOUNT) + changeProviderAmountOfFees
 		} else {
 			updater.AddOutputs([]psetv2.OutputArgs{{
-				Asset:  currencyToAsset["tL-BTC"].AssetHash,
+				Asset:  currencyToAsset["L-BTC"].AssetHash,
 				Amount: changeProviderAmountOfFees,
 				Script: changeProviderScriptOfFees,
 			}})
@@ -169,7 +169,7 @@ func (t *Trade) PrepareFulfillTransaction(
 	}
 
 	updater.AddOutputs([]psetv2.OutputArgs{{
-		Asset:  currencyToAsset["tL-BTC"].AssetHash,
+		Asset:  currencyToAsset["L-BTC"].AssetHash,
 		Amount: feeAmountWithoutCreatingDust,
 	}})
 
@@ -205,7 +205,7 @@ func (t *Trade) ExecuteTrade() error {
 	}
 
 	// subsidize the tx fees
-	utxosForFees, changeAmountForFees, err := t.walletService.SelectUtxos(context.Background(), currencyToAsset["tL-BTC"].AssetHash, FEE_AMOUNT)
+	utxosForFees, changeAmountForFees, err := t.walletService.SelectUtxos(context.Background(), currencyToAsset["L-BTC"].AssetHash, FEE_AMOUNT)
 	if err != nil {
 		return fmt.Errorf("error in SelectUtxos for fees: %w", err)
 	}

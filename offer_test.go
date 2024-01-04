@@ -33,7 +33,7 @@ func TestCreateFundingOutput(t *testing.T) {
 	assert.Equal(t, traderScriptExpected, traderPayment.Script)
 
 	inputAmount := uint64(200)
-	inputAsset, _ := elementsutil.AssetHashToBytes(currencyToAsset["tL-BTC"].AssetHash)
+	inputAsset, _ := elementsutil.AssetHashToBytes(currencyToAsset["L-BTC"].AssetHash)
 	outputAmount := uint64(200)
 	outputAsset, _ := elementsutil.AssetHashToBytes(currencyToAsset["USDT"].AssetHash)
 
@@ -95,12 +95,12 @@ func TestFulfillTransaction(t *testing.T) {
 			Script: providerPayment.Script,
 		},
 		{
-			Asset:  currencyToAsset["tL-BTC"].AssetHash,
+			Asset:  currencyToAsset["L-BTC"].AssetHash,
 			Amount: 99500,
 			Script: providerPayment.Script,
 		},
 		{
-			Asset:  currencyToAsset["tL-BTC"].AssetHash,
+			Asset:  currencyToAsset["L-BTC"].AssetHash,
 			Amount: 500,
 		},
 	}

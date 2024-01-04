@@ -8,62 +8,67 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org"></script>
 </head>
-<body class="bg-white text-gray-800">
-  <div class="min-h-screen flex items-center justify-center">
-    <div class="max-w-lg mx-auto p-8">
-      <form action="/api/trade" method="POST">
-        <div class="grid gap-4">
-          <div class="flex items-center justify-between p-4 border-2 border-gray-300 rounded-md">
-            <select id="inputCurrency" name="inputCurrency">
-              {{range .inputAssets}}
-              <option value="{{.Ticker}}">{{.Ticker}} - {{.Name}}</option>
-              {{end}}
-            </select>
-            <input type="text" name="inputValue" class="text-right font-semibold bg-transparent outline-none">
-          </div>
-          <div class="text-right text-sm" hx-sse="connect:/rate?input=tL-BTC&output=USDT swap:message">
-            Loading...
-          </div>
 
-          <div class="flex justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24"
-              stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
+<body class="bg-white text-gray-800"></body>
+<div class="min-h-screen flex items-center justify-center">
+  <div class="max-w-lg mx-auto p-8">
+    <form action="/trade" method="POST">
+      <div class="grid gap-4">
+        <label for="inputValue" class="block text-sm font-medium text-gray-700">You send</label>
+        <div class="flex items-center justify-between p-4 border-2 border-gray-300 rounded-md">
 
-          <div class="flex items-center justify-between p-4 border-2 border-gray-300 rounded-md">
-            <select id="outputCurrency" name="outputCurrency">
-              {{range .outputAssets}}
-              <option value="{{.Ticker}}">{{.Ticker}} - {{.Name}}</option>
-              {{end}}
-            </select>
-            <input type="text" name="outputValue" class="text-right font-semibold bg-transparent outline-none">
-          </div>
-          <div class="text-right text-sm" hx-sse="connect:/rate?input=tL-BTC&output=USDT swap:message">
-            Loading...
-          </div>
+          <select id="inputCurrency" name="inputCurrency" onchange="onTradeInputChange()">
+            {{range .inputAssets}}
+            <option value="{{.Ticker}}">{{.Ticker}} - {{.Name}}</option>
+            {{end}}
+          </select>
+          <div class="loading-indicator" style="display: none;">Loading...</div>
+          <input type="text" id="inputValue" name="inputValue" oninput="onTradeInputChange()"
+            class="text-right font-semibold bg-transparent outline-none">
+
         </div>
-        <div class="border border-gray-300 rounded-md p-4 mt-4 mb-2">
-          <div class="mb-4">
-            <label for="traderAddress" class="block text-sm font-medium text-gray-700">Receive at Address</label>
-            <input type="text" name="traderAddress" id="traderAddress" onchange="onInputChange()"
-              class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" placeholder="ex1..." />
-          </div>
-          <div class="mb-4 text-center" id="orText">or</div>
-          <div class="mb-4">
-            <button type="button" id="connectButton" onclick="connectMarina()"
-              class="w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm">Connect with
-              Marina</button>
-          </div>
+        <div class="flex justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
-        <button disabled type="submit" id="tradeButton"
-            class="w-full px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm">Trade</button>
-      </form>
+
+        <label for="outputValue" class="block text-sm font-medium text-gray-700">You receive</label>
+        <div class="flex items-center justify-between p-4 border-2 border-gray-300 rounded-md">
+
+          <select id="outputCurrency" name="outputCurrency" onchange="onTradeInputChange()">
+            {{range .outputAssets}}
+            <option value="{{.Ticker}}">{{.Ticker}} - {{.Name}}</option>
+            {{end}}
+          </select>
+          <input readonly type="text" id="outputValue" name="outputValue"
+            class="text-right font-semibold bg-transparent outline-none">
+        </div>
+      </div>
+      <div class="border border-gray-300 rounded-md p-4 mt-4 mb-2">
+        <div class="mb-4">
+          <label for="traderAddress" class="block text-sm font-medium text-gray-700">Receive at Address</label>
+          <input type="text" name="traderAddress" id="traderAddress" onchange="onConnectInputChange()"
+            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" placeholder="ex1..." />
+        </div>
+        <div class="mb-4 text-center" id="orText">or</div>
+        <div class="mb-4">
+          <button type="button" id="connectButton" onclick="connectMarina()"
+            class="w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm">Connect with
+            Marina</button>
+        </div>
+      </div>
+      <button disabled type="submit" id="tradeButton"
+        class="w-full px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm">Trade</button>
+    </form>
+    <div class="text-center text-sm mt-8" hx-sse="connect:/rates?inputCurrency=USDT&outputCurrency=L-BTC swap:message">
+      Loading...
     </div>
+
   </div>
+</div>
 </body>
-<script src="https://unpkg.com/htmx.org"></script>
 <script>
   window.onload = async function () {
     const isEnabled = await window.marina.isEnabled();
@@ -74,15 +79,37 @@
       updateViewAfterConnect(traderScript, traderAddress);
   }
 
-  async function onInputChange() {
+  async function onTradeInputChange() {
+    const inputValue = document.querySelector('#inputValue').value;
+    const inputCurrency = document.querySelector('#inputCurrency').value;
+    const outputCurrency = document.querySelector('#outputCurrency').value;
+
+    // Check if any of the values are empty
+    if (!inputValue || !inputCurrency || !outputCurrency) {
+      return; // Skip the request
+    }
+    
+    const params = new URLSearchParams();
+    params.append('inputValue', inputValue);
+    params.append('inputCurrency', inputCurrency);
+    params.append('outputCurrency', outputCurrency);
+    
+    // Make GET request to /trade/preview
+    const url = `/trade/preview?${params.toString()}`;
+    htmx.ajax('GET', url, {target:'#outputValue', swap:'outerHTML'})
+  }
+
+
+
+  async function onConnectInputChange() {
     const input = document.getElementById('traderAddress')
     const traderAddress = input.value;
     const traderScript = input.value;
 
     if (!traderAddress) return;
-    
+
     updateViewAfterConnect(traderScript, traderAddress);
-  
+
     localStorage.setItem('traderScript', input.value);
     localStorage.setItem('traderAddress', input.value);
   }
@@ -139,7 +166,7 @@
     const tradeButton = document.getElementById('tradeButton');
     const orText = document.getElementById('orText');
 
-    tradeButton.innerText = 'Trade';    
+    tradeButton.innerText = 'Trade';
     tradeButton.disabled = false;
 
     orText.style.display = 'none';

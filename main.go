@@ -63,7 +63,97 @@ func main() {
 	router.LoadHTMLGlob("web/*")
 
 	// API
-	router.POST("/api/trade", func(c *gin.Context) {
+	router.GET("/rates", func(c *gin.Context) {
+		// Set the necessary headers for SSE
+		c.Writer.Header().Set("Content-Type", "text/event-stream")
+		c.Writer.Header().Set("Cache-Control", "no-cache")
+		c.Writer.Header().Set("Connection", "keep-alive")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// params
+		input := c.Query("inputCurrency")
+		output := c.Query("outputCurrency")
+		mkt := getMarket(input, output)
+
+		// Create a channel to send rates
+		rateChan := make(chan string)
+		// Start a goroutine to generate rates
+		go func() {
+			for {
+				rate, err := getConversionRate(input, output)
+				if err != nil {
+					rateChan <- fmt.Sprintf("<div>Error: %v</div>", err)
+				} else {
+					var operation string
+					var limit uint64
+
+					if mkt.BaseAsset == output {
+						operation = "Buy"
+						limit = mkt.BuyLimit
+					} else if mkt.QuoteAsset == input {
+						operation = "Sell"
+						limit = mkt.SellLimit
+					}
+
+					html := fmt.Sprintf("<div>1 %s = %f %s</div>", input, rate, output)
+					html += fmt.Sprintf("<div>%s limit: %d</div>", operation, limit)
+					rateChan <- html
+				}
+
+				time.Sleep(30 * time.Second)
+			}
+		}()
+
+		for {
+			select {
+			case rate := <-rateChan:
+				// Write the HTML string to the response writer
+				c.Writer.Write([]byte(fmt.Sprintf("data: %v\n\n", rate)))
+				c.Writer.Flush()
+			case <-c.Done():
+				// If the client has disconnected, we can stop sending events
+				return
+			}
+		}
+
+	})
+
+	router.GET("/trade/preview", func(c *gin.Context) {
+		// Get the input ticker, output ticker, and amount from the query parameters
+		inputCurrency := c.Query("inputCurrency")
+		outputCurrency := c.Query("outputCurrency")
+		inputValueStr := c.Query("inputValue")
+
+		// Convert the input value to a float
+		inputValue, err := strconv.ParseFloat(inputValueStr, 64)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid input value")
+			return
+		}
+
+		// Get the conversion rate and fee
+		realRate, err := getConversionRate(inputCurrency, outputCurrency)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Could not get conversion rate")
+			return
+		}
+
+		feePercentage := getFeePercentage(inputCurrency, outputCurrency)
+
+		// Adjust the rate based on the fee
+		rate := realRate * (1 + feePercentage/100)
+
+		// Calculate the output amount
+		outputAmount := rate * inputValue
+
+		// Return the output amount
+		outputValueHTML := fmt.Sprintf(`<input readonly type="text" id="outputValue" name="outputValue" class="text-right font-semibold bg-transparent outline-none" value="%f">`, outputAmount)
+
+		// Return the HTML string
+		c.String(http.StatusOK, outputValueHTML)
+	})
+
+	router.POST("/trade", func(c *gin.Context) {
 
 		// Extract values from the request
 		inputValue := c.PostForm("inputValue")
@@ -231,45 +321,6 @@ func main() {
 				return
 			}
 		}
-	})
-
-	router.GET("/rate", func(c *gin.Context) {
-		// Set the necessary headers for SSE
-		c.Writer.Header().Set("Content-Type", "text/event-stream")
-		c.Writer.Header().Set("Cache-Control", "no-cache")
-		c.Writer.Header().Set("Connection", "keep-alive")
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-
-		// Create a channel to send rates
-		rateChan := make(chan string)
-		// Start a goroutine to generate rates
-		go func() {
-			for {
-				input := "tL-BTC"
-				output := "USDT"
-				rate, err := getConversionRate(input, output)
-				if err != nil {
-					rateChan <- fmt.Sprintf("<div>Error: %v</div>", err)
-				} else {
-					rateChan <- fmt.Sprintf("<div>~ %f %s</div>", rate, output)
-				}
-
-				time.Sleep(1 * time.Minute)
-			}
-		}()
-
-		for {
-			select {
-			case rate := <-rateChan:
-				// Write the HTML string to the response writer
-				c.Writer.Write([]byte(fmt.Sprintf("data: %v\n\n", rate)))
-				c.Writer.Flush()
-			case <-c.Done():
-				// If the client has disconnected, we can stop sending events
-				return
-			}
-		}
-
 	})
 
 	router.Run(":8080")

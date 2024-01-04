@@ -14,6 +14,12 @@ type Price struct {
 	Rate        float64
 }
 
+func getFeePercentage(inputTicker, outputTicker string) float64 {
+	// Set a fixed fee percentage
+	const feePercentage = -0.2 // 0.2% fee
+	return feePercentage
+}
+
 func getConversionRate(inputCurrency, outputCurrency string) (float64, error) {
 	// Convert the input and output currencies using the currencyMapping
 	inputCurrencySymbol, ok := currencyToSymbol[inputCurrency]
@@ -62,13 +68,13 @@ func fetchConversionRate() (float64, error) {
 	price, found := cache[tradingPair]
 	mutex.Unlock()
 
-	if found && time.Since(price.LastUpdated).Minutes() < 1 {
-		// Return the cached rate if it's less than 1 minute old
+	if found && time.Since(price.LastUpdated).Seconds() < 30 {
+		// Return the cached rate if it's less than 10 seconds old
 		return price.Rate, nil
 	}
 
 	// Fetch the conversion rate from the API
-	resp, err := http.Get("https://oracle.fuji.money/oracle/" + tradingPair)
+	resp, err := http.Get("https://oracle.fuji-labs.io/oracle/" + tradingPair)
 	if err != nil {
 		return 0, err
 	}

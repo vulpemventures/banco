@@ -81,7 +81,7 @@ func submitDummyOrder() (*Order, error) {
 }
 
 func generateRandomCurrency() string {
-	currencies := []string{"FUSD", "USDT", "tL-BTC"}
+	currencies := []string{"FUSD", "USDT", "L-BTC"}
 	randomIndex := rand.Intn(len(currencies))
 	return currencies[randomIndex]
 }
