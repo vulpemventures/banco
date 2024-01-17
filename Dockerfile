@@ -28,6 +28,8 @@ COPY web/ /app/web/
 
 # Copy the built binary from the previous stage
 COPY --from=builder /app/bin/banco /app/banco
+COPY --from=builder /app/web/. /app/web
+
 
 # Expose the port that the server listens on
 EXPOSE 8080
