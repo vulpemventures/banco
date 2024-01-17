@@ -7,184 +7,235 @@
   <title>Banco Exchange</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org"></script>
+  <style>
+    /* Custom styles for a playful look */
+    .chart-placeholder {
+      background: repeating-linear-gradient(45deg,
+          #f0f0f0,
+          #f0f0f0 10px,
+          #fafafa 10px,
+          #fafafa 20px);
+    }
+
+    .button-active {
+      box-shadow: 0 4px 14px 0 rgba(0, 118, 255, 0.39);
+    }
+
+    .input-highlight {
+      border: 2px solid #60a5fa;
+    }
+  </style>
+  <style>
+    input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    /* Radio button checked */
+    input[type="radio"]:checked+label {
+      background-color: #3b82f6;
+      /* bg-blue-500 */
+      color: #f8fafc;
+      /* text-white */
+    }
+
+    input[type="radio"]:not(:checked)+label {
+      background-color: #d1d5db;
+      /* bg-gray-300 */
+      color: #374151;
+      /* text-gray-700 */
+    }
+  </style>
 </head>
 
-<body class="bg-white text-gray-800"></body>
-<div class="min-h-screen flex items-center justify-center">
-  <div class="max-w-lg mx-auto p-8">
-    <form action="/trade" method="POST">
-      <div class="grid gap-4">
-        <label for="inputValue" class="block text-sm font-medium text-gray-700">You send</label>
-        <div class="flex items-center justify-between p-4 border-2 border-gray-300 rounded-md">
-
-          <select id="inputCurrency" name="inputCurrency" onchange="onTradeInputChange()">
-            {{range .inputAssets}}
-            <option value="{{.Ticker}}">{{.Ticker}} - {{.Name}}</option>
-            {{end}}
-          </select>
-          <div class="loading-indicator" style="display: none;">Loading...</div>
-          <input type="text" id="inputValue" name="inputValue" oninput="onTradeInputChange()"
-            class="text-right font-semibold bg-transparent outline-none">
-
-        </div>
-        <div class="flex justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24"
-            stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-
-        <label for="outputValue" class="block text-sm font-medium text-gray-700">You receive</label>
-        <div class="flex items-center justify-between p-4 border-2 border-gray-300 rounded-md">
-
-          <select id="outputCurrency" name="outputCurrency" onchange="onTradeInputChange()">
-            {{range .outputAssets}}
-            <option value="{{.Ticker}}">{{.Ticker}} - {{.Name}}</option>
-            {{end}}
-          </select>
-          <input readonly type="text" id="outputValue" name="outputValue"
-            class="text-right font-semibold bg-transparent outline-none">
-        </div>
+<body class="bg-gray-50 text-gray-800 font-sans">
+  <div class="min-h-screen flex p-10">
+    <div class="w-1/2 flex flex-col items-center justify-center">
+      <h2 id="priceTitle" class="text-2xl font-bold text-gray-700 mb-4">BTC - USDT</h2>
+      <div id="chart" class="h-96 w-full bg-gray-200 rounded-lg chart-placeholder">
+        <!-- Chart rendering will go here -->
       </div>
-      <div class="border border-gray-300 rounded-md p-4 mt-4 mb-2">
-        <div class="mb-4">
-          <label for="traderAddress" class="block text-sm font-medium text-gray-700">Receive at Address</label>
-          <input type="text" name="traderAddress" id="traderAddress" onchange="onConnectInputChange()"
-            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" placeholder="ex1..." />
-        </div>
-        <div class="mb-4 text-center" id="orText">or</div>
-        <div class="mb-4">
-          <button type="button" id="connectButton" onclick="connectMarina()"
-            class="w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm">Connect with
-            Marina</button>
-        </div>
-      </div>
-      <button disabled type="submit" id="tradeButton"
-        class="w-full px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm">Trade</button>
-    </form>
-    <div class="text-center text-sm mt-8" hx-sse="connect:/rates?inputCurrency=USDT&outputCurrency=L-BTC swap:message">
-      Loading...
     </div>
+    <div class="w-1/2 flex flex-col items-center justify-center">
+      <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <form action="/trade" method="POST">
+          <div class="flex mb-4">
+            <input type="radio" id="buy" name="type" value="Buy" checked>
+            <label for="buy" class="bg-blue-500 text-white py-2 px-4 mx-1 rounded-lg cursor-pointer">Buy</label>
 
+            <input type="radio" id="sell" name="type" value="Sell">
+            <label for="sell" class="bg-gray-300 text-gray-700 py-2 px-4 mx-1 rounded-lg cursor-pointer">Sell</label>
+          </div>
+          <div class="mb-4">
+            <label for="pairSelect" class="block text-sm font-medium text-gray-700">Market</label>
+            <select id="pairSelect" name="pair" class="block w-full mt-1 border border-gray-300 rounded-md p-2">
+              {{ range .markets }}
+              <option value="{{ .BaseAsset }}/{{ .QuoteAsset }}">{{ .BaseAsset }} / {{ .QuoteAsset }}</option>
+              {{ end }}
+              <!-- Additional options here -->
+            </select>
+          </div>
+          <div class="mb-4">
+            <label for="amountInput" class="block text-sm font-medium text-gray-700">Quantity</label>
+            <input type="text" id="amountInput" name="amount"
+              class="block w-full mt-1 border border-gray-300 rounded-md p-2 input-highlight" placeholder="1 BTC"
+              hx-get="/trade/preview" hx-trigger="keyup changed delay:500ms"
+              hx-vals="js:{pair: getSelectedMarket(), type: tradeType() }" hx-target="#recapBox" hx-swap="outerHTML">
+          </div>
+          <div id="recapBox" class="p-4 bg-gray-100 rounded-lg" style="display: none;">
+            <label id="recapText" class="block text-sm font-medium text-gray-700">To Send</label>
+            <p id="recapAmount" class="text-lg font-semibold">40'000 USDT</p>
+          </div>
+          <div class="border border-gray-300 rounded-md p-4 mt-4 mb-2">
+            <div class="mb-1">
+              <label for="traderAddress" class="block text-sm font-medium text-gray-700">Receive at Address</label>
+              <input type="text" name="traderAddress" id="traderAddress" onchange="onConnectInputChange()"
+                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" placeholder="ex1..." />
+            </div>
+            <div class="mb-1 text-center" id="orText">or</div>
+            <div class="mb-4">
+              <button type="button" id="connectButton" onclick="connectMarina()"
+                class="w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm">Connect with
+                Marina</button>
+            </div>
+          </div>
+          <!-- Place order -->
+          <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg shadow mt-4">Place
+            Order</button>
+        </form>
+
+      </div>
+    </div>
   </div>
-</div>
-</body>
-<script>
-  window.onload = async function () {
-    const isEnabled = await window.marina.isEnabled();
-    const traderScript = localStorage.getItem('traderScript')
-    const traderAddress = localStorage.getItem('traderAddress')
-
-    if (isEnabled && traderScript && traderAddress)
-      updateViewAfterConnect(traderScript, traderAddress);
-  }
-
-  async function onTradeInputChange() {
-    const inputValue = document.querySelector('#inputValue').value;
-    const inputCurrency = document.querySelector('#inputCurrency').value;
-    const outputCurrency = document.querySelector('#outputCurrency').value;
-
-    // Check if any of the values are empty
-    if (!inputValue || !inputCurrency || !outputCurrency) {
-      return; // Skip the request
-    }
-    
-    const params = new URLSearchParams();
-    params.append('inputValue', inputValue);
-    params.append('inputCurrency', inputCurrency);
-    params.append('outputCurrency', outputCurrency);
-    
-    // Make GET request to /trade/preview
-    const url = `/trade/preview?${params.toString()}`;
-    htmx.ajax('GET', url, {target:'#outputValue', swap:'outerHTML'})
-  }
-
-
-
-  async function onConnectInputChange() {
-    const input = document.getElementById('traderAddress')
-    const traderAddress = input.value;
-    
-    if (!traderAddress) return;
-
-    const response = await fetch(`/address-to-script/${traderAddress}`);
-    const traderScript = await response.text();
-
-    updateViewAfterConnect(traderScript, traderAddress);
-
-    localStorage.setItem('traderScript', input.value);
-    localStorage.setItem('traderAddress', input.value);
-  }
-
-  async function connectMarina() {
-    try {
+  <script>
+    window.onload = async function () {
       const isEnabled = await window.marina.isEnabled();
+      const traderScript = localStorage.getItem('traderScript')
+      const traderAddress = localStorage.getItem('traderAddress')
 
-      // Ask user for permissions
-      await window.marina.enable();
-
-      const addresses = await window.marina.getAddresses();
-
-      if (addresses.length === 0) {
-        const { script, unconfidentialAddress } = await window.marina.getNextAddress();
-        // updated view
-        updateViewAfterConnect(script, unconfidentialAddress);
-
-        // persist state
-        localStorage.setItem('traderScript', script);
-        localStorage.setItem('traderAddress', unconfidentialAddress);
-      } else {
-        const derivationPath = "m/0/0";
-        let firstAddress;
-
-        for (const address of addresses) {
-          if (address.derivationPath === derivationPath) {
-            firstAddress = address;
-            break;
-          }
-        }
-
-        const { script, unconfidentialAddress } = firstAddress;
-        // updated view
-        updateViewAfterConnect(script, unconfidentialAddress);
-
-        // persist state
-        localStorage.setItem('traderScript', script);
-        localStorage.setItem('traderAddress', unconfidentialAddress);
-      }
-    } catch (error) {
-      console.error(error);
+      if (isEnabled && traderScript && traderAddress)
+        updateViewAfterConnect(traderScript, traderAddress);
     }
-  }
 
-  function updateViewAfterConnect(script, address) {
-    // update the Liquid address input
-    const traderInput = document.getElementById('traderAddress');
-    traderInput.value = address;
-    traderInput.disabled = true;
+    document.body.addEventListener('htmx:configRequest', function (evt) {
 
-    // Update form buttons and texts
-    const connectButton = document.getElementById('connectButton');
-    const tradeButton = document.getElementById('tradeButton');
-    const orText = document.getElementById('orText');
+    });
 
-    tradeButton.innerText = 'Trade';
-    tradeButton.disabled = false;
+    function toggleActive(type) {
+      const buyButton = document.getElementById('buyButton');
+      const sellButton = document.getElementById('sellButton');
 
-    orText.style.display = 'none';
+      if (type === 'buy') {
+        buyButton.classList.replace('bg-gray-300', 'bg-blue-500');
+        buyButton.classList.replace('text-gray-700', 'text-white');
+        sellButton.classList.replace('bg-blue-500', 'bg-gray-300');
+        sellButton.classList.replace('text-white', 'text-gray-700');
+      } else if (type === 'sell') {
+        sellButton.classList.replace('bg-gray-300', 'bg-blue-500');
+        sellButton.classList.replace('text-gray-700', 'text-white');
+        buyButton.classList.replace('bg-blue-500', 'bg-gray-300');
+        buyButton.classList.replace('text-white', 'text-gray-700');
+      }
+    }
 
-    connectButton.style.display = 'none';
+    function getSelectedMarket() {
+      const selectElement = document.getElementById('pairSelect');
+      const selectedOption = selectElement.options[selectElement.selectedIndex];
+      return selectedOption.value;
+    }
 
-    // Attach script taken from Marina step when Trade submit button is clicked
-    // Attach the script to the form submission
-    const scriptInput = document.createElement('input');
-    scriptInput.type = 'hidden';
-    scriptInput.name = 'traderScript';
-    scriptInput.value = script;
+    function getAmount() {
+      const inputElement = document.getElementById('amountInput');
+      return inputElement.value;
+    }
 
-    const form = document.querySelector('form');
-    form.appendChild(scriptInput);
-  }
-</script>
+    function tradeType() {
+      return document.querySelector('input[name="type"]:checked').value;
+    }
+
+
+    async function onConnectInputChange() {
+      const input = document.getElementById('traderAddress')
+      const traderAddress = input.value;
+
+      if (!traderAddress) return;
+
+      const response = await fetch(`/address-to-script/${traderAddress}`);
+      const traderScript = await response.text();
+
+      updateViewAfterConnect(traderScript, traderAddress);
+
+      localStorage.setItem('traderScript', input.value);
+      localStorage.setItem('traderAddress', input.value);
+    }
+
+    async function connectMarina() {
+      try {
+        const isEnabled = await window.marina.isEnabled();
+
+        // Ask user for permissions
+        await window.marina.enable();
+
+        const addresses = await window.marina.getAddresses();
+
+        if (addresses.length === 0) {
+          const { script, unconfidentialAddress } = await window.marina.getNextAddress();
+          // updated view
+          updateViewAfterConnect(script, unconfidentialAddress);
+
+          // persist state
+          localStorage.setItem('traderScript', script);
+          localStorage.setItem('traderAddress', unconfidentialAddress);
+        } else {
+          const derivationPath = "m/0/0";
+          let firstAddress;
+
+          for (const address of addresses) {
+            if (address.derivationPath === derivationPath) {
+              firstAddress = address;
+              break;
+            }
+          }
+
+          const { script, unconfidentialAddress } = firstAddress;
+          // updated view
+          updateViewAfterConnect(script, unconfidentialAddress);
+
+          // persist state
+          localStorage.setItem('traderScript', script);
+          localStorage.setItem('traderAddress', unconfidentialAddress);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    function updateViewAfterConnect(script, address) {
+      // update the Liquid address input
+      const traderInput = document.getElementById('traderAddress');
+      traderInput.value = address;
+      traderInput.disabled = true;
+
+      // Update form buttons and texts
+      const connectButton = document.getElementById('connectButton');
+      connectButton.style.display = 'none';
+
+      const orText = document.getElementById('orText');
+      orText.style.display = 'none';
+
+      // Attach script taken from Marina step when Trade submit button is clicked
+      // Attach the script to the form submission
+      const scriptInput = document.createElement('input');
+      scriptInput.type = 'hidden';
+      scriptInput.name = 'traderScript';
+      scriptInput.value = script;
+
+      const form = document.querySelector('form');
+      form.appendChild(scriptInput);
+    }
+  </script>
+</body>
 
 </html>

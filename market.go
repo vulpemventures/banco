@@ -14,7 +14,7 @@ type Market struct {
 }
 
 func getMarkets() []Market {
-	markets := []Market{
+	return []Market{
 		{
 			BaseAsset:         "FUSD",
 			QuoteAsset:        "USDT",
@@ -47,7 +47,6 @@ func getMarkets() []Market {
 		},
 		// Add more markets here if needed
 	}
-	return markets
 }
 
 func getMarket(baseAsset, quoteAsset string) *Market {
@@ -55,6 +54,16 @@ func getMarket(baseAsset, quoteAsset string) *Market {
 	for _, market := range markets {
 		if (market.BaseAsset == baseAsset && market.QuoteAsset == quoteAsset) ||
 			(market.BaseAsset == quoteAsset && market.QuoteAsset == baseAsset) {
+			return &market
+		}
+	}
+	return nil
+}
+
+func getTradingPair(pair string) *Market {
+	markets := getMarkets()
+	for _, market := range markets {
+		if market.BaseAsset+"/"+market.QuoteAsset == pair {
 			return &market
 		}
 	}

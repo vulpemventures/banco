@@ -61,95 +61,130 @@ func main() {
 		}, watchInterval)
 	}
 
+	// rates client
+	rates := NewKrakenClient()
+	if rates == nil {
+		log.Fatalf("cant be nil")
+	}
+
+	err = rates.Subscribe()
+	if err != nil {
+		log.Fatalf("failed to subscribe to kraken ws: %v", err)
+	}
+
 	router := gin.Default()
 	router.LoadHTMLGlob("web/*")
 
 	// API
 	router.GET("/rates", func(c *gin.Context) {
+		// params
+		input := c.Query("inputCurrency")
+		output := c.Query("outputCurrency")
+
+		mkt := getMarket(input, output)
+		if mkt == nil {
+			c.String(http.StatusBadRequest, "Invalid currency pair")
+			return
+		}
+		var operation string
+		var limit uint64
+		if mkt.BaseAsset == output {
+			operation = "Buy"
+			limit = mkt.BuyLimit
+		} else if mkt.QuoteAsset == input {
+			operation = "Sell"
+			limit = mkt.SellLimit
+		}
+
 		// Set the necessary headers for SSE
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		c.Writer.Header().Set("Cache-Control", "no-cache")
 		c.Writer.Header().Set("Connection", "keep-alive")
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
-		// params
-		input := c.Query("inputCurrency")
-		output := c.Query("outputCurrency")
-		mkt := getMarket(input, output)
+		// Create a new ticker that fires every second
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
 
-		// Create a channel to send rates
-		rateChan := make(chan string)
-		// Start a goroutine to generate rates
-		go func() {
-			for {
-				rate, err := getConversionRate(input, output)
-				if err != nil {
-					rateChan <- fmt.Sprintf("<div>Error: %v</div>", err)
-				} else {
-					var operation string
-					var limit uint64
-
-					if mkt.BaseAsset == output {
-						operation = "Buy"
-						limit = mkt.BuyLimit
-					} else if mkt.QuoteAsset == input {
-						operation = "Sell"
-						limit = mkt.SellLimit
-					}
-
-					html := fmt.Sprintf("<div>1 %s = %f %s</div>", input, rate, output)
-					html += fmt.Sprintf("<div>%s limit: %d</div>", operation, limit)
-					rateChan <- html
-				}
-
-				time.Sleep(30 * time.Second)
-			}
-		}()
-
+		// Loop that sends a message every second until the client disconnects
 		for {
 			select {
-			case rate := <-rateChan:
-				// Write the HTML string to the response writer
-				c.Writer.Write([]byte(fmt.Sprintf("data: %v\n\n", rate)))
-				c.Writer.Flush()
 			case <-c.Done():
-				// If the client has disconnected, we can stop sending events
+				// The client has disconnected, stop sending messages
 				return
+			case <-ticker.C:
+				// The ticker has fired, send a message
+				price, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
+				if err != nil {
+					log.Println(err.Error())
+					continue
+				}
+
+				html := fmt.Sprintf("<div>1 %s = %f %s</div>", input, price, output)
+				html += fmt.Sprintf("<div>%s limit: %d</div>", operation, limit)
+
+				// Create the SSE data string
+				sse := fmt.Sprintf("event: rate\ndata: %s\n\n", html)
+
+				// Write the SSE data string to the response
+				_, err = c.Writer.Write([]byte(sse))
+				if err != nil {
+					log.Println(err.Error())
+					return
+				}
+
+				// Flush the response writer to send the data immediately
+				c.Writer.Flush()
 			}
 		}
-
 	})
 
 	router.GET("/trade/preview", func(c *gin.Context) {
 		// Get the input ticker, output ticker, and amount from the query parameters
-		inputCurrency := c.Query("inputCurrency")
-		outputCurrency := c.Query("outputCurrency")
-		inputValueStr := c.Query("inputValue")
+		amountStr := c.Query("amount")
+		pair := c.Query("pair")
+		tradeType := c.Query("type")
 
 		// Convert the input value to a float
-		inputValue, err := strconv.ParseFloat(inputValueStr, 64)
+		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
 			c.String(http.StatusBadRequest, "Invalid input value")
 			return
 		}
 
 		// Get the conversion rate and fee
-		realRate, err := getConversionRate(inputCurrency, outputCurrency)
-		if err != nil {
-			c.String(http.StatusInternalServerError, "Could not get conversion rate")
+		mkt := getTradingPair(pair)
+		if mkt == nil {
+			c.String(http.StatusBadRequest, "Invalid trading pair")
 			return
 		}
 
-		feePercentage := getFeePercentage(inputCurrency, outputCurrency)
+		price, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "error getting price from stream")
+			return
+		}
+
+		// TODO check if need to be inverse
+		feePercentage := rates.FeePercentage(mkt.BaseAsset, mkt.QuoteAsset)
 
 		// Adjust the rate based on the fee
-		rate := realRate * (1 + feePercentage/100)
+		rate := price * (1 + feePercentage/100)
 
 		// Calculate the output amount
-		outputAmount := rate * inputValue
+		previewAmt := rate * amount
+
+		// Determine the action based on the trade type
+		action := "You Send"
+		if tradeType == "Buy" {
+			action = "You Receive"
+		}
 
 		// Return the output amount
-		outputValueHTML := fmt.Sprintf(`<input readonly type="text" id="outputValue" name="outputValue" class="text-right font-semibold bg-transparent outline-none" value="%f">`, outputAmount)
+		outputValueHTML := fmt.Sprintf(`<div id="recapBox" class="p-4 bg-gray-100 rounded-lg">
+    	<label id="recapText" class="block text-sm font-medium text-gray-700">%s</label>
+    <p id="recapAmount" class="text-lg font-semibold">%f %s</p>
+</div>`, action, previewAmt, mkt.QuoteAsset)
 
 		// Return the HTML string
 		c.String(http.StatusOK, outputValueHTML)
@@ -157,18 +192,52 @@ func main() {
 
 	router.POST("/trade", func(c *gin.Context) {
 
-		// Extract values from the request
-		inputValue := c.PostForm("inputValue")
-		outputValue := c.PostForm("outputValue")
-		inputCurrency := c.PostForm("inputCurrency")
-		outputCurrency := c.PostForm("outputCurrency")
 		traderScriptHex := c.PostForm("traderScript")
-		if inputValue == "" || outputValue == "" || inputCurrency == "" || outputCurrency == "" || traderScriptHex == "" {
-			c.HTML(http.StatusBadRequest, "error.html", gin.H{"error": "missing form data"})
+		tradingPair := c.PostForm("pair")
+		amountStr := c.PostForm("amount")
+		tradeType := c.PostForm("type")
+
+		if amountStr == "" || tradingPair == "" || tradeType == "" || traderScriptHex == "" {
+			c.HTML(http.StatusBadRequest, "404.html", gin.H{"error": "missing form data"})
 			return
 		}
 
-		order, err := NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue)
+		// Convert the input value to a float
+		amount, err := strconv.ParseFloat(amountStr, 64)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid input value")
+			return
+		}
+
+		// Get the conversion rate and fee
+		mkt := getTradingPair(tradingPair)
+		if mkt == nil {
+			c.String(http.StatusBadRequest, "Invalid trading pair")
+			return
+		}
+
+		price, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "error getting price from stream")
+			return
+		}
+		feePercentage := rates.FeePercentage(mkt.BaseAsset, mkt.QuoteAsset)
+		// Determine the input value, input currency, output value, and output currency based on the trade type
+		var inputValue, outputValue float64
+		var inputCurrency, outputCurrency string
+		if tradeType == "Buy" {
+			inputValue = amount * (1 + feePercentage/100) // Add the fee to the input value
+			inputCurrency = mkt.QuoteAsset
+			outputValue = amount
+			outputCurrency = mkt.BaseAsset
+		} else if tradeType == "Sell" { // Sell
+			inputValue = amount
+			inputCurrency = mkt.BaseAsset
+			outputValue = amount * price * (1 - feePercentage/100) // Subtract the fee from the output value
+			outputCurrency = mkt.QuoteAsset
+		}
+
+		order, err := NewOrder(traderScriptHex, inputCurrency, fmt.Sprintf("%v", inputValue), outputCurrency, fmt.Sprintf("%v", outputValue), price)
 		if err != nil {
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 			return
@@ -183,11 +252,10 @@ func main() {
 		c.Redirect(http.StatusSeeOther, "/offer/"+order.ID)
 	})
 
-	// Web
 	router.GET("/", func(c *gin.Context) {
+		markets := getMarkets()
 		c.HTML(http.StatusOK, "trade.html", gin.H{
-			"inputAssets":  tradableAssets("USDT"),
-			"outputAssets": tradableAssets("FUSD"),
+			"markets": markets,
 		})
 	})
 

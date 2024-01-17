@@ -32,7 +32,7 @@ type Order struct {
 }
 type OrderStatus string
 
-func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue string) (*Order, error) {
+func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue string, rate float64) (*Order, error) {
 	traderScript, err := hex.DecodeString(traderScriptHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode trader script: %w", err)
@@ -70,13 +70,6 @@ func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, output
 	outputAmount := uint64(outputValueFloat * math.Pow(10, float64(outputAsset.Precision)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get output asset: %w", err)
-	}
-
-	// check conversion rate
-	// check if the rate is acceptable
-	rate, err := getConversionRate(inputCurrency, outputCurrency)
-	if err != nil {
-		return nil, err
 	}
 
 	// Calculate the expected output value with the slippage tolerance

@@ -77,7 +77,7 @@ func submitDummyOrder() (*Order, error) {
 	outputValue := generateRandomValue()
 
 	// Create the order with the generated values
-	return NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue)
+	return NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue, 45000)
 }
 
 func generateRandomCurrency() string {
