@@ -162,7 +162,7 @@ func main() {
 
 		rate, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
 		if err != nil {
-			c.String(http.StatusInternalServerError, "error getting price from stream")
+			c.String(http.StatusInternalServerError, fmt.Sprintf("error getting price from stream: %v", err))
 			return
 		}
 
@@ -220,7 +220,7 @@ func main() {
 
 		price, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
 		if err != nil {
-			c.String(http.StatusInternalServerError, "error getting price from stream")
+			c.String(http.StatusInternalServerError, fmt.Sprintf("error getting price from stream: %v", err))
 			return
 		}
 		feePercentage := rates.FeePercentage(mkt.BaseAsset, mkt.QuoteAsset)

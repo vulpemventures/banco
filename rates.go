@@ -8,16 +8,6 @@ import (
 	ws "github.com/aopoltorzhicky/go_kraken/websocket"
 )
 
-var CurrencyToSymbol = map[string]string{
-	"USDT":  "USD",
-	"FUSD":  "USD",
-	"L-BTC": "BTC",
-}
-
-type MarketWithStream struct {
-	market    Market
-	priceChan chan float64
-}
 type RatesClient interface {
 	Subscribe() error
 	MarketPrice(base, quote string) (float64, error)
@@ -58,7 +48,7 @@ func (kc *KrakenClient) MarketPrice(base, quote string) (float64, error) {
 	select {
 	case price := <-priceStream:
 		return price, nil
-	case <-time.After(5 * time.Second): // adjust the timeout as needed
+	case <-time.After(10 * time.Second): // adjust the timeout as needed
 		return 0, fmt.Errorf("timeout waiting for price %s", base+"/"+quote)
 	}
 }
@@ -70,12 +60,21 @@ func (kc *KrakenClient) Subscribe() error {
 	// Create channels to stream the market prices
 	kc.PriceStreams["FUSD/USDT"] = make(chan float64)
 	kc.PriceStreams["L-BTC/USDT"] = make(chan float64)
+	kc.PriceStreams["L-BTC/L-BTC"] = make(chan float64)
 
 	// FUSD/USDT
 	// For now we fix the exchange rate to 1:1
 	go func() {
 		for {
 			kc.PriceStreams["FUSD/USDT"] <- 1.00
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
+	// L-BTC/L-BTC
+	go func() {
+		for {
+			kc.PriceStreams["L-BTC/L-BTC"] <- 1.00
 			time.Sleep(1 * time.Second)
 		}
 	}()

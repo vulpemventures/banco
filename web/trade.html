@@ -11,13 +11,7 @@
 
 <body class="bg-gray-50 text-gray-800 font-sans">
   <div class="min-h-screen flex p-10">
-    <div class="w-1/2 flex flex-col items-center justify-center">
-      <h2 id="priceTitle" class="text-2xl font-bold text-gray-700 mb-4">BTC - USDT</h2>
-      <div id="chart" class="h-96 w-full bg-gray-200 rounded-lg chart-placeholder">
-        <!-- Chart rendering will go here -->
-      </div>
-    </div>
-    <div class="w-1/2 flex flex-col items-center justify-center">
+    <div class="w-screen flex flex-col items-center justify-center">
       <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <form action="/trade" method="POST">
           <div class="flex mb-4">
@@ -26,7 +20,6 @@
 
             <input type="radio" id="sell" name="type" value="Sell" onclick="changeTradeType()">
             <label for="sell" class="bg-gray-300 text-gray-700 py-2 px-4 mx-1 rounded-lg cursor-pointer">Sell</label>
-
           </div>
           <div class="mb-4">
             <label for="pairSelect" class="block text-sm font-medium text-gray-700">Market</label>
