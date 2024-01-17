@@ -44,7 +44,7 @@ func NewKrakenClient() *KrakenClient {
 
 func (kc *KrakenClient) FeePercentage(base, quote string) float64 {
 	// Set a fixed fee percentage
-	const feePercentage = -0.2 // 0.2% fee
+	const feePercentage = 1 // 1% fee
 	return feePercentage
 }
 

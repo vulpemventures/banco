@@ -145,6 +145,7 @@ func main() {
 		pair := c.Query("pair")
 		tradeType := c.Query("type")
 
+		log.Println(amountStr, pair, tradeType)
 		// Convert the input value to a float
 		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
@@ -159,7 +160,7 @@ func main() {
 			return
 		}
 
-		price, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
+		rate, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
 		if err != nil {
 			c.String(http.StatusInternalServerError, "error getting price from stream")
 			return
@@ -168,15 +169,16 @@ func main() {
 		// TODO check if need to be inverse
 		feePercentage := rates.FeePercentage(mkt.BaseAsset, mkt.QuoteAsset)
 
-		// Adjust the rate based on the fee
-		rate := price * (1 + feePercentage/100)
-
 		// Calculate the output amount
 		previewAmt := rate * amount
 
-		// Determine the action based on the trade type
-		action := "You Send"
+		// Adjust the output amount based on the trade type and determine the action
+		var action string
 		if tradeType == "Buy" {
+			previewAmt *= (1 + feePercentage/100) // Add the fee to the output amount
+			action = "You Send"
+		} else { // Sell
+			previewAmt *= (1 - feePercentage/100) // Subtract the fee from the output amount
 			action = "You Receive"
 		}
 
