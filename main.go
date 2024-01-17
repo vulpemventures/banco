@@ -19,9 +19,13 @@ import (
 
 var oceanURL string = os.Getenv("OCEAN_URL")
 var watchIntervalStr string = os.Getenv("WATCH_INTERVAL_SECONDS")
+var webDir string = os.Getenv("WEB_DIR")
 
 func main() {
 	// Parse environment variables
+	if webDir == "" {
+		webDir = "web"
+	}
 	if oceanURL == "" {
 		oceanURL = "localhost:18000"
 	}
@@ -73,7 +77,7 @@ func main() {
 	}
 
 	router := gin.Default()
-	router.LoadHTMLGlob("web/*")
+	router.LoadHTMLGlob(webDir + "/*")
 
 	// API
 	router.GET("/rates", func(c *gin.Context) {
@@ -335,7 +339,7 @@ func main() {
 			for {
 				order, status, err := fetchOrderByID(id)
 				if err != nil {
-					log.Println("error fetching order by ID:", err)
+					log.Println("error fetching order:", err, "Order ID:", id)
 					continue
 				}
 
