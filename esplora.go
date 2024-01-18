@@ -24,15 +24,21 @@ type Esplora struct {
 	NetworkName string
 }
 
-func NewEsplora(networkName string) (*Esplora, error) {
-	// Map of network names to base API URLs
-	baseAPIURLs := map[string]string{
-		"liquid":  "https://blockstream.info/liquid/api",
-		"testnet": "https://blockstream.info/liquidtestnet/api",
-	}
+var EsploraAPIURLs = map[string]string{
+	"liquid":  "https://blockstream.info/liquid/api",
+	"testnet": "https://blockstream.info/liquidtestnet/api",
+	"regtest": "http://localhost:3001",
+}
 
+var EsploraURLs = map[string]string{
+	"liquid":  "https://blockstream.info/liquid",
+	"testnet": "https://blockstream.info/liquidtestnet",
+	"regtest": "http://localhost:5001",
+}
+
+func NewEsplora(networkName string) (*Esplora, error) {
 	// Get the base API URL for the network
-	baseAPIURL, ok := baseAPIURLs[networkName]
+	baseAPIURL, ok := EsploraAPIURLs[networkName]
 	if !ok {
 		return nil, fmt.Errorf("invalid network %s", networkName)
 	}

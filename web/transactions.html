@@ -10,7 +10,8 @@
   {{ $pending = true }}
   <div class="transaction-row">
     <p class="transaction-id">
-      <a href="https://blockstream.info/liquidtestnet/tx/{{.txID}}" target="_blank">🔗 {{.txIDShort}}</a>
+
+      <a href="{{.explorerTxURL}}" target="_blank">🔗 {{.txIDShort}}</a>
     </p>
     <p class="block-time">📆 {{.date}}</p>
   </div>
@@ -28,7 +29,7 @@
   {{ $confirmed = true }}
   <div class="transaction-row">
     <p class="transaction-id">
-      <a href="https://blockstream.info/liquidtestnet/tx/{{.txID}}" target="_blank">🔗 {{.txIDShort}}</a>
+      <a href="{{.explorerTxURL}}" target="_blank">🔗 {{.txIDShort}}</a>
     </p>
     <p class="block-time">📆 {{.date}}</p>
   </div>

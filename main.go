@@ -25,7 +25,7 @@ func main() {
 	// Set default values
 	viper.SetDefault("WEB_DIR", "web")
 	viper.SetDefault("OCEAN_URL", "localhost:18000")
-	viper.SetDefault("WATCH_INTERVAL_SECONDS", "5")
+	viper.SetDefault("WATCH_INTERVAL_SECONDS", "2")
 	viper.SetDefault("NETWORK", "liquid")
 
 	// Set up Logrus for logging
@@ -238,13 +238,15 @@ func main() {
 		}
 
 		// manipulate template data and render page
+		log.Info(EsploraAPIURLs[networkName])
 		transactionHistory := make([]map[string]interface{}, len(transactions))
 		for i, tx := range transactions {
 			transactionHistory[i] = map[string]interface{}{
-				"txID":      tx.TxID,
-				"txIDShort": tx.TxID[:6] + "..." + tx.TxID[len(tx.TxID)-6:],
-				"confirmed": tx.Status.Confirmed,
-				"date":      time.Unix(int64(tx.Status.BlockTime), 0).Format("2006-01-02 15:04:05"),
+				"txID":          tx.TxID,
+				"txIDShort":     tx.TxID[:6] + "..." + tx.TxID[len(tx.TxID)-6:],
+				"confirmed":     tx.Status.Confirmed,
+				"date":          time.Unix(int64(tx.Status.BlockTime), 0).Format("2006-01-02 15:04:05"),
+				"explorerTxURL": fmt.Sprintf("%s/tx/%s", EsploraURLs[networkName], tx.TxID),
 			}
 		}
 		inputCurrency := assetToCurrency[order.Input.Asset]
@@ -295,10 +297,11 @@ func main() {
 				transactionHistory := make([]map[string]interface{}, len(transactions))
 				for i, tx := range transactions {
 					transactionHistory[i] = map[string]interface{}{
-						"txID":      tx.TxID,
-						"txIDShort": tx.TxID[:6] + "..." + tx.TxID[len(tx.TxID)-6:],
-						"confirmed": tx.Status.Confirmed,
-						"date":      time.Unix(int64(tx.Status.BlockTime), 0).Format("2006-01-02 15:04:05"),
+						"txID":          tx.TxID,
+						"txIDShort":     tx.TxID[:6] + "..." + tx.TxID[len(tx.TxID)-6:],
+						"confirmed":     tx.Status.Confirmed,
+						"date":          time.Unix(int64(tx.Status.BlockTime), 0).Format("2006-01-02 15:04:05"),
+						"explorerTxURL": fmt.Sprintf("%s/tx/%s", EsploraURLs[networkName], tx.TxID),
 					}
 				}
 

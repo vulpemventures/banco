@@ -62,23 +62,6 @@ func (kc *KrakenClient) Subscribe() error {
 	kc.PriceStreams["L-BTC/USDT"] = make(chan float64)
 	kc.PriceStreams["L-BTC/L-BTC"] = make(chan float64)
 
-	// FUSD/USDT
-	// For now we fix the exchange rate to 1:1
-	go func() {
-		for {
-			kc.PriceStreams["FUSD/USDT"] <- 1.00
-			time.Sleep(1 * time.Second)
-		}
-	}()
-
-	// L-BTC/L-BTC
-	go func() {
-		for {
-			kc.PriceStreams["L-BTC/L-BTC"] <- 1.00
-			time.Sleep(1 * time.Second)
-		}
-	}()
-
 	// XBT/USDT
 	// Subscribe to ticker information for the trading pair
 	if err := kc.ws.SubscribeTicker([]string{ws.BTCUSDT}); err != nil {
@@ -108,5 +91,21 @@ func (kc *KrakenClient) Subscribe() error {
 		}
 	}()
 
+	// FUSD/USDT
+	// For now we fix the exchange rate to 1:1
+	go func() {
+		for {
+			kc.PriceStreams["FUSD/USDT"] <- 1.00
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
+	// L-BTC/L-BTC
+	go func() {
+		for {
+			kc.PriceStreams["L-BTC/L-BTC"] <- 1.00
+			time.Sleep(1 * time.Second)
+		}
+	}()
 	return nil
 }
