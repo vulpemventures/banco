@@ -10,14 +10,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/vulpemventures/go-elements/elementsutil"
 	"github.com/vulpemventures/go-elements/network"
-	"github.com/vulpemventures/go-elements/payment"
 )
 
 type Order struct {
 	ID            string
 	Timestamp     time.Time
 	Address       string
-	PaymentData   *payment.Payment
+	Network       *network.Network
 	FulfillScript []byte
 	RefundScript  []byte
 	TraderScript  []byte
@@ -32,7 +31,7 @@ type Order struct {
 }
 type OrderStatus string
 
-func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue string, rate float64) (*Order, error) {
+func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue string, rate float64, net *network.Network) (*Order, error) {
 	traderScript, err := hex.DecodeString(traderScriptHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode trader script: %w", err)
@@ -93,7 +92,7 @@ func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, output
 		return nil, fmt.Errorf("failed to create refund script: %w", err)
 	}
 
-	output, err := CreateFundingOutput(fulfillScript, refundScript, &network.Testnet)
+	output, err := CreateFundingOutput(fulfillScript, refundScript, net)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create funding output: %w", err)
 	}
@@ -106,7 +105,7 @@ func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, output
 		ID:            uuid.New().String(),
 		Timestamp:     time.Now(),
 		Address:       address,
-		PaymentData:   output,
+		Network:       net,
 		FulfillScript: fulfillScript,
 		RefundScript:  refundScript,
 		TraderScript:  traderScript,

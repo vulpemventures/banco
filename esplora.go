@@ -19,8 +19,32 @@ type Transaction struct {
 	} `json:"status"`
 }
 
-func fetchTransactionHistory(address string) ([]Transaction, error) {
-	apiURL := fmt.Sprintf("https://blockstream.info/liquidtestnet/api/address/%s/txs", address)
+type Esplora struct {
+	BaseAPIURL  string
+	NetworkName string
+}
+
+func NewEsplora(networkName string) (*Esplora, error) {
+	// Map of network names to base API URLs
+	baseAPIURLs := map[string]string{
+		"liquid":  "https://blockstream.info/liquid/api",
+		"testnet": "https://blockstream.info/liquidtestnet/api",
+	}
+
+	// Get the base API URL for the network
+	baseAPIURL, ok := baseAPIURLs[networkName]
+	if !ok {
+		return nil, fmt.Errorf("invalid network %s", networkName)
+	}
+
+	return &Esplora{
+		BaseAPIURL:  baseAPIURL,
+		NetworkName: networkName,
+	}, nil
+}
+
+func (e *Esplora) FetchTransactionHistory(address string) ([]Transaction, error) {
+	apiURL := fmt.Sprintf("%s/address/%s/txs", e.BaseAPIURL, address)
 
 	resp, err := http.Get(apiURL)
 	if err != nil {
@@ -45,8 +69,8 @@ func fetchTransactionHistory(address string) ([]Transaction, error) {
 	return transactions, nil
 }
 
-func fetchPrevout(txHash string, txIndex int) (*transaction.TxOutput, error) {
-	apiURL := fmt.Sprintf("https://blockstream.info/liquidtestnet/api/tx/%s/hex", txHash)
+func (e *Esplora) FetchPrevout(txHash string, txIndex int) (*transaction.TxOutput, error) {
+	apiURL := fmt.Sprintf("%s/tx/%s/hex", e.BaseAPIURL, txHash)
 
 	resp, err := http.Get(apiURL)
 	if err != nil {
@@ -71,8 +95,8 @@ func fetchPrevout(txHash string, txIndex int) (*transaction.TxOutput, error) {
 	return txOutput, nil
 }
 
-func fetchUnspents(address string) ([]*UTXO, error) {
-	apiURL := fmt.Sprintf("https://blockstream.info/liquidtestnet/api/address/%s/utxo", address)
+func (e *Esplora) FetchUnspents(address string) ([]*UTXO, error) {
+	apiURL := fmt.Sprintf("%s/address/%s/utxo", e.BaseAPIURL, address)
 
 	resp, err := http.Get(apiURL)
 	if err != nil {

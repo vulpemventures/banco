@@ -10,6 +10,8 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/tiero/banco/pkg/bufferutil"
+	"github.com/vulpemventures/go-elements/network"
+	"github.com/vulpemventures/go-elements/payment"
 	"github.com/vulpemventures/go-elements/psetv2"
 	"github.com/vulpemventures/go-elements/taproot"
 )
@@ -29,16 +31,21 @@ type Trade struct {
 	Status         TradeStatus
 	Order          *Order
 	FundingUnspent *UTXO
+	FundingPayment *payment.Payment
 	walletService  WalletService
 }
 
 type CancelTransaction struct{}
 
 // FromFundedOrder accepts an Order and sets it at the funded state.
-func FromFundedOrder(walletSvc WalletService, order *Order, fundingUnspent *UTXO) *Trade {
+func FromFundedOrder(walletSvc WalletService, order *Order, fundingUnspent *UTXO) (*Trade, error) {
 	// TODO does this should be raise an error instead?
 	if fundingUnspent == nil {
-		return FromPendingOrder(walletSvc, order)
+		return FromPendingOrder(walletSvc, order), nil
+	}
+	paymentData, err := CreateFundingOutput(order.FulfillScript, order.RefundScript, &network.Testnet)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create funding output: %w", err)
 	}
 	// TODO check if there is a spent outpoint on the chain
 	return &Trade{
@@ -46,7 +53,8 @@ func FromFundedOrder(walletSvc WalletService, order *Order, fundingUnspent *UTXO
 		Order:          order,
 		Status:         Funded,
 		FundingUnspent: fundingUnspent,
-	}
+		FundingPayment: paymentData,
+	}, nil
 }
 
 func FromPendingOrder(walletSvc WalletService, order *Order) *Trade {
@@ -90,8 +98,8 @@ func (t *Trade) PrepareFulfillTransaction(
 	updater.AddInSighashType(inputIndex, txscript.SigHashDefault)
 
 	// update taproot stuff
-	taprootTree := t.Order.PaymentData.Taproot.ScriptTree
-	internalKeyBytes := append([]byte{0x02}, t.Order.PaymentData.Taproot.XOnlyInternalKey...)
+	taprootTree := t.FundingPayment.Taproot.ScriptTree
+	internalKeyBytes := append([]byte{0x02}, t.FundingPayment.Taproot.XOnlyInternalKey...)
 	internalKey, err := secp256k1.ParsePubKey(internalKeyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to ParsePubKey: %w", err)
@@ -237,7 +245,7 @@ func (t *Trade) ExecuteTrade() error {
 
 	// Manually setting the FinalScriptWitness into the unsigned tx
 	// psetv2 finalizer does not support script without signature
-	taprootTree := t.Order.PaymentData.Taproot.ScriptTree
+	taprootTree := t.FundingPayment.Taproot.ScriptTree
 	if err != nil {
 		return fmt.Errorf("error in decoding tx hex: %w", err)
 	}
@@ -255,7 +263,7 @@ func (t *Trade) ExecuteTrade() error {
 	}
 
 	leafProof := taprootTree.LeafMerkleProofs[leafIndex]
-	internalKeyBytes := append([]byte{0x02}, t.Order.PaymentData.Taproot.XOnlyInternalKey...)
+	internalKeyBytes := append([]byte{0x02}, t.FundingPayment.Taproot.XOnlyInternalKey...)
 	internalPubKey, err := btcec.ParsePubKey(internalKeyBytes)
 	if err != nil {
 		log.Fatalf("Failed to parse public key: %v", err)

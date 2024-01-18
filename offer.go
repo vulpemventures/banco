@@ -22,7 +22,7 @@ const (
 
 func CreateFundingOutput(fulfillScript []byte, refundScript []byte, net *network.Network) (*payment.Payment, error) {
 	if net == nil {
-		net = &network.Testnet
+		net = &network.Liquid
 	}
 
 	unspendableKeyBytes, err := hex.DecodeString(UNSPENDABLE_POINT)

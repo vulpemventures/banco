@@ -12,8 +12,9 @@
 <body class="bg-gray-50 text-gray-800 font-sans">
   <div class="min-h-screen flex p-10">
     <div class="w-screen flex flex-col items-center justify-center">
-      <h1 class="text-2xl font-bold mb-2">Banco Exchange</h1>
-      <p class="text-md mb-4">Decentralized exchange for the Liquid Network</p>
+      <h1 class="text-2xl font-bold mb-2">Banco</h1>
+      <p class="text-md mb-4">Unstoppabe Trading</p>
+
       <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <form action="/trade" method="POST">
           <div class="flex mb-4">
@@ -61,8 +62,14 @@
           <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg shadow mt-4">Place
             Order</button>
         </form>
-
       </div>
+      <p>
+        {{ if eq .network "testnet" }}
+        <span class="text-xs ml-2">🧪 Liquid Testnet</span>
+        {{ else if eq .network "liquid" }}
+        <span class="text-xs ml-2">💧 Liquid</span>
+        {{ end }}
+      </p>
     </div>
   </div>
   <script>
@@ -78,23 +85,6 @@
     document.body.addEventListener('htmx:configRequest', function (evt) {
 
     });
-
-    function toggleActive(type) {
-      const buyButton = document.getElementById('buyButton');
-      const sellButton = document.getElementById('sellButton');
-
-      if (type === 'buy') {
-        buyButton.classList.replace('bg-gray-300', 'bg-blue-500');
-        buyButton.classList.replace('text-gray-700', 'text-white');
-        sellButton.classList.replace('bg-blue-500', 'bg-gray-300');
-        sellButton.classList.replace('text-white', 'text-gray-700');
-      } else if (type === 'sell') {
-        sellButton.classList.replace('bg-gray-300', 'bg-blue-500');
-        sellButton.classList.replace('text-gray-700', 'text-white');
-        buyButton.classList.replace('bg-blue-500', 'bg-gray-300');
-        buyButton.classList.replace('text-white', 'text-gray-700');
-      }
-    }
 
     function getSelectedMarket() {
       const selectElement = document.getElementById('pairSelect');
@@ -121,7 +111,6 @@
       recapBox.style.display = 'none'
     }
 
-
     async function onConnectInputChange() {
       const input = document.getElementById('traderAddress')
       const traderAddress = input.value;
@@ -144,6 +133,11 @@
         // Ask user for permissions
         await window.marina.enable();
 
+        // check network 
+        const network = await window.marina.getNetwork();
+        if (network !== "{{.network}}") {
+          return alert("Change the network to {{.network}} in your Marina extension")
+        }
         const addresses = await window.marina.getAddresses();
 
         if (addresses.length === 0) {

@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -13,32 +12,39 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"github.com/vulpemventures/go-elements/address"
 	_ "modernc.org/sqlite"
 )
 
-var oceanURL string = os.Getenv("OCEAN_URL")
-var watchIntervalStr string = os.Getenv("WATCH_INTERVAL_SECONDS")
-var webDir string = os.Getenv("WEB_DIR")
-
 func main() {
+	// Set up Viper for configuration
+	viper.AutomaticEnv()
+
+	// Set default values
+	viper.SetDefault("WEB_DIR", "web")
+	viper.SetDefault("OCEAN_URL", "localhost:18000")
+	viper.SetDefault("WATCH_INTERVAL_SECONDS", "5")
+	viper.SetDefault("NETWORK", "liquid")
+
+	// Set up Logrus for logging
+	log.SetFormatter(&log.TextFormatter{})
+	log.SetOutput(os.Stdout)
+
 	// Parse environment variables
-	if webDir == "" {
-		webDir = "web"
-	}
-	if oceanURL == "" {
-		oceanURL = "localhost:18000"
-	}
-	watchInterval := -1
-	if watchIntervalStr != "" {
-		var err error
-		watchInterval, err = strconv.Atoi(watchIntervalStr)
-		if err != nil {
-			log.Fatal("watchInterval: ", err)
-		}
+	webDir := viper.GetString("WEB_DIR")
+	oceanURL := viper.GetString("OCEAN_URL")
+	networkName := viper.GetString("NETWORK")
+	watchInterval := viper.GetInt("WATCH_INTERVAL_SECONDS")
+
+	// validate network
+	net, ok := SupportedNetworks[networkName]
+	if !ok {
+		log.Fatalf("Invalid network: %s", networkName)
 	}
 
-	// DB
+	// SQLite Database
 	_, err := initDB()
 	if err != nil {
 		log.Fatal("connectToDB: ", err)
@@ -55,7 +61,7 @@ func main() {
 			}
 			log.Println("Pending orders", len(orders))
 			for _, order := range orders {
-				err = watchForTrades(order, oceanURL)
+				err = watchForTrades(order, oceanURL, networkName)
 				if err != nil {
 					log.Println(fmt.Errorf("error in fulfilling order with ID %s: %v", order.ID, err))
 					continue
@@ -80,69 +86,6 @@ func main() {
 	router.LoadHTMLGlob(webDir + "/*")
 
 	// API
-	router.GET("/rates", func(c *gin.Context) {
-		// params
-		input := c.Query("inputCurrency")
-		output := c.Query("outputCurrency")
-
-		mkt := getMarket(input, output)
-		if mkt == nil {
-			c.String(http.StatusBadRequest, "Invalid currency pair")
-			return
-		}
-		var operation string
-		var limit uint64
-		if mkt.BaseAsset == output {
-			operation = "Buy"
-			limit = mkt.BuyLimit
-		} else if mkt.QuoteAsset == input {
-			operation = "Sell"
-			limit = mkt.SellLimit
-		}
-
-		// Set the necessary headers for SSE
-		c.Writer.Header().Set("Content-Type", "text/event-stream")
-		c.Writer.Header().Set("Cache-Control", "no-cache")
-		c.Writer.Header().Set("Connection", "keep-alive")
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-
-		// Create a new ticker that fires every second
-		ticker := time.NewTicker(1 * time.Second)
-		defer ticker.Stop()
-
-		// Loop that sends a message every second until the client disconnects
-		for {
-			select {
-			case <-c.Done():
-				// The client has disconnected, stop sending messages
-				return
-			case <-ticker.C:
-				// The ticker has fired, send a message
-				price, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
-				if err != nil {
-					log.Println(err.Error())
-					continue
-				}
-
-				html := fmt.Sprintf("<div>1 %s = %f %s</div>", input, price, output)
-				html += fmt.Sprintf("<div>%s limit: %d</div>", operation, limit)
-
-				// Create the SSE data string
-				sse := fmt.Sprintf("event: rate\ndata: %s\n\n", html)
-
-				// Write the SSE data string to the response
-				_, err = c.Writer.Write([]byte(sse))
-				if err != nil {
-					log.Println(err.Error())
-					return
-				}
-
-				// Flush the response writer to send the data immediately
-				c.Writer.Flush()
-			}
-		}
-	})
-
 	router.GET("/trade/preview", func(c *gin.Context) {
 		// Get the input ticker, output ticker, and amount from the query parameters
 		amountStr := c.Query("amount")
@@ -243,7 +186,7 @@ func main() {
 			outputCurrency = mkt.QuoteAsset
 		}
 
-		order, err := NewOrder(traderScriptHex, inputCurrency, fmt.Sprintf("%v", inputValue), outputCurrency, fmt.Sprintf("%v", outputValue), price)
+		order, err := NewOrder(traderScriptHex, inputCurrency, fmt.Sprintf("%v", inputValue), outputCurrency, fmt.Sprintf("%v", outputValue), price, net)
 		if err != nil {
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 			return
@@ -262,6 +205,7 @@ func main() {
 		markets := getMarkets()
 		c.HTML(http.StatusOK, "trade.html", gin.H{
 			"markets": markets,
+			"network": networkName,
 		})
 	})
 
@@ -271,7 +215,7 @@ func main() {
 		ID, err := fetchOrderIDByAddress(addr)
 		if err != nil {
 			log.Println(err.Error())
-			c.HTML(http.StatusNotFound, "404.html", gin.H{"error": err.Error()})
+			c.HTML(http.StatusNotFound, "404.html", gin.H{})
 			return
 		}
 
@@ -283,14 +227,13 @@ func main() {
 
 		order, status, err := fetchOrderByID(id)
 		if err != nil {
-			log.Println(err.Error())
-			c.HTML(http.StatusNotFound, "404.html", gin.H{"error": err.Error()})
+			c.HTML(http.StatusNotFound, "404.html", gin.H{})
 			return
 		}
 
-		transactions, err := fetchTransactionHistory(order.Address)
+		transactions, err := getTransactionsForAddress(order.Address, networkName)
 		if err != nil {
-			c.HTML(http.StatusInternalServerError, "error.html", gin.H{})
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 			return
 		}
 
@@ -343,10 +286,10 @@ func main() {
 					continue
 				}
 
-				transactions, err := fetchTransactionHistory(order.Address)
+				transactions, err := getTransactionsForAddress(order.Address, networkName)
 				if err != nil {
-					log.Println("Error fetching transaction history:", err)
-					continue
+					c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+					return
 				}
 
 				transactionHistory := make([]map[string]interface{}, len(transactions))
@@ -427,3 +370,69 @@ func startWatching(fn func(), watchInterval int) {
 		time.Sleep(time.Duration(watchInterval) * time.Second)
 	}
 }
+
+/***
+router.GET("/rates", func(c *gin.Context) {
+	// params
+	input := c.Query("inputCurrency")
+	output := c.Query("outputCurrency")
+
+	mkt := getMarket(input, output)
+	if mkt == nil {
+		c.String(http.StatusBadRequest, "Invalid currency pair")
+		return
+	}
+	var operation string
+	var limit uint64
+	if mkt.BaseAsset == output {
+		operation = "Buy"
+		limit = mkt.BuyLimit
+	} else if mkt.QuoteAsset == input {
+		operation = "Sell"
+		limit = mkt.SellLimit
+	}
+
+	// Set the necessary headers for SSE
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Create a new ticker that fires every second
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	// Loop that sends a message every second until the client disconnects
+	for {
+		select {
+		case <-c.Done():
+			// The client has disconnected, stop sending messages
+			return
+		case <-ticker.C:
+			// The ticker has fired, send a message
+			price, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
+			if err != nil {
+				log.Println(err.Error())
+				continue
+			}
+
+			html := fmt.Sprintf("<div>1 %s = %f %s</div>", input, price, output)
+			html += fmt.Sprintf("<div>%s limit: %d</div>", operation, limit)
+
+			// Create the SSE data string
+			sse := fmt.Sprintf("event: rate\ndata: %s\n\n", html)
+
+			// Write the SSE data string to the response
+			_, err = c.Writer.Write([]byte(sse))
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+
+			// Flush the response writer to send the data immediately
+			c.Writer.Flush()
+		}
+	}
+})
+
+***/

@@ -4,9 +4,31 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/vulpemventures/go-elements/network"
 )
 
-func watchForTrades(order *Order, oceanURL string) error {
+// Network: Map of network names to struct instances
+var SupportedNetworks map[string]*network.Network = map[string]*network.Network{
+	"liquid":  &network.Liquid,
+	"testnet": &network.Testnet,
+	"regtest": &network.Regtest,
+}
+
+func getTransactionsForAddress(addr, networkName string) ([]Transaction, error) {
+	esplora, err := NewEsplora(networkName)
+	if err != nil {
+		return nil, fmt.Errorf("esplora initialization error: %w", err)
+	}
+	transactions, err := esplora.FetchTransactionHistory(addr)
+	if err != nil {
+		return nil, fmt.Errorf("esplora fetch txs error: %w", err)
+	}
+
+	return transactions, nil
+}
+
+func watchForTrades(order *Order, oceanURL, networkName string) error {
 	if duration := time.Since(order.Timestamp); duration > 10*time.Minute {
 		err := updateOrderStatus(order.ID, "Expired")
 		if err != nil {
@@ -14,7 +36,11 @@ func watchForTrades(order *Order, oceanURL string) error {
 		}
 	}
 
-	utxos, err := fetchUnspents(order.Address)
+	esplora, err := NewEsplora(networkName)
+	if err != nil {
+		return fmt.Errorf("esplora initialization error: %w", err)
+	}
+	utxos, err := esplora.FetchUnspents(order.Address)
 	if err != nil {
 		return fmt.Errorf("error fetching unspents: %w", err)
 	}
@@ -27,6 +53,7 @@ func watchForTrades(order *Order, oceanURL string) error {
 			order,
 			utxos,
 			oceanURL,
+			networkName,
 		)
 		if err != nil {
 			return fmt.Errorf("error executing trade: %v", err)
@@ -51,24 +78,32 @@ func coinsAreMoreThan(utxos []*UTXO, amount uint64) bool {
 	return totalValue >= amount
 }
 
-func executeTrades(order *Order, unspents []*UTXO, oceanURL string) ([]*Trade, error) {
+func executeTrades(order *Order, unspents []*UTXO, oceanURL, networkName string) ([]*Trade, error) {
 	walletSvc, err := NewWalletService(oceanURL)
 	if err != nil {
 		return nil, err
 	}
 
+	esplora, err := NewEsplora(networkName)
+	if err != nil {
+		return nil, fmt.Errorf("esplora initialization error: %w", err)
+	}
+
 	trades := []*Trade{}
 	for _, unspent := range unspents {
-		prevout, err := fetchPrevout(unspent.Txid, unspent.Index)
+		prevout, err := esplora.FetchPrevout(unspent.Txid, unspent.Index)
 		if err != nil {
 			return nil, err
 		}
 		unspent.Prevout = prevout
-		trade := FromFundedOrder(
+		trade, err := FromFundedOrder(
 			walletSvc,
 			order,
 			unspent,
 		)
+		if err != nil {
+			return nil, err
+		}
 
 		if trade.Status != Funded {
 			return nil, fmt.Errorf("trade is not funded: %v", err)

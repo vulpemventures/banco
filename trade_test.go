@@ -8,6 +8,7 @@ import (
 	"math/rand"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/vulpemventures/go-elements/network"
 )
 
 func TestTrade_ExecuteTrade(t *testing.T) {
@@ -22,7 +23,7 @@ func TestTrade_ExecuteTrade(t *testing.T) {
 		t.Fatal("newOrder", err)
 	}
 
-	trade := FromFundedOrder(
+	trade, err := FromFundedOrder(
 		walletSvc,
 		order,
 		&UTXO{
@@ -30,6 +31,9 @@ func TestTrade_ExecuteTrade(t *testing.T) {
 			Index: 1,
 		},
 	)
+	if err != nil {
+		t.Fatal("FromFundedOrder", err)
+	}
 
 	// Execute the trade
 	err = trade.ExecuteTrade()
@@ -51,10 +55,13 @@ func TestTrade_CancelTrade(t *testing.T) {
 	}
 
 	// Create a new trade
-	trade := FromFundedOrder(walletSvc, order, &UTXO{
+	trade, err := FromFundedOrder(walletSvc, order, &UTXO{
 		Txid:  "foo",
 		Index: 1,
 	})
+	if err != nil {
+		t.Fatal("FromFundedOrder", err)
+	}
 
 	// Cancel the trade
 	err = trade.CancelTrade()
@@ -77,7 +84,7 @@ func submitDummyOrder() (*Order, error) {
 	outputValue := generateRandomValue()
 
 	// Create the order with the generated values
-	return NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue, 45000)
+	return NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, outputValue, 2, &network.Testnet)
 }
 
 func generateRandomCurrency() string {

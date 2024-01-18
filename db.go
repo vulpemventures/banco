@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
-
-	"github.com/vulpemventures/go-elements/network"
 )
 
 const (
@@ -191,15 +189,9 @@ func fetchOrdersToFulfill() ([]*Order, error) {
 			return nil, err
 		}
 
-		paymentData, err := CreateFundingOutput(order.FulfillScript, order.RefundScript, &network.Testnet)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create funding output: %w", err)
-		}
-
 		orders = append(orders, &Order{
 			ID:            order.ID,
 			Timestamp:     timestamp,
-			PaymentData:   paymentData,
 			FulfillScript: order.FulfillScript,
 			RefundScript:  order.RefundScript,
 			TraderScript:  order.TraderScript,
@@ -270,15 +262,9 @@ func fetchOrderByID(id string) (*Order, string, error) {
 		return nil, "", err
 	}
 
-	paymentData, err := CreateFundingOutput(order.FulfillScript, order.RefundScript, &network.Testnet)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to create funding output: %w", err)
-	}
-
 	return &Order{
 		ID:            order.ID,
 		Timestamp:     timestamp,
-		PaymentData:   paymentData,
 		FulfillScript: order.FulfillScript,
 		RefundScript:  order.RefundScript,
 		TraderScript:  order.TraderScript,
