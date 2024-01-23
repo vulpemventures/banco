@@ -13,7 +13,7 @@ import (
 
 func TestTrade_ExecuteTrade(t *testing.T) {
 	// setup ocean wallet client
-	walletSvc, err := NewWalletService("localhost:18000")
+	walletSvc, err := NewWalletService("localhost:18000", "default")
 	if err != nil {
 		t.Fatal("newOrder", err)
 	}
@@ -44,7 +44,7 @@ func TestTrade_ExecuteTrade(t *testing.T) {
 
 func TestTrade_CancelTrade(t *testing.T) {
 	// setup ocean wallet client
-	walletSvc, err := NewWalletService("http://localhost:18000")
+	walletSvc, err := NewWalletService("http://localhost:18000", "default")
 	if err != nil {
 		t.Fatal("newOrder")
 	}

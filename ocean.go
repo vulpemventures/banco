@@ -13,11 +13,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const ACCOUNT_LABEL = "default"
 const MSATS_PER_BYTE = 110
 
 type service struct {
 	addr          string
+	accountName   string
 	conn          *grpc.ClientConn
 	walletClient  pb.WalletServiceClient
 	accountClient pb.AccountServiceClient
@@ -93,7 +93,7 @@ type UTXO struct {
 	} `json:"status"`
 }
 
-func NewWalletService(addr string) (WalletService, error) {
+func NewWalletService(addr, accountName string) (WalletService, error) {
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
@@ -103,6 +103,7 @@ func NewWalletService(addr string) (WalletService, error) {
 	txClient := pb.NewTransactionServiceClient(conn)
 	svc := &service{
 		addr:          addr,
+		accountName:   accountName,
 		conn:          conn,
 		walletClient:  walletClient,
 		accountClient: accountClient,
@@ -125,14 +126,14 @@ func NewWalletService(addr string) (WalletService, error) {
 	}
 	found := false
 	for _, account := range info.GetAccounts() {
-		if account.GetLabel() == ACCOUNT_LABEL {
+		if account.GetLabel() == svc.accountName {
 			found = true
 			break
 		}
 	}
 	if !found {
 		if _, err := accountClient.CreateAccountBIP44(ctx, &pb.CreateAccountBIP44Request{
-			Label:          ACCOUNT_LABEL,
+			Label:          svc.accountName,
 			Unconfidential: true,
 		}); err != nil {
 			return nil, err
@@ -163,7 +164,7 @@ func (s *service) GetAddress(
 	var addr string
 	if isChange {
 		res, err := s.accountClient.DeriveChangeAddresses(ctx, &pb.DeriveChangeAddressesRequest{
-			AccountName:    ACCOUNT_LABEL,
+			AccountName:    s.accountName,
 			NumOfAddresses: uint64(1),
 		})
 		if err != nil {
@@ -175,7 +176,7 @@ func (s *service) GetAddress(
 		addr = res.GetAddresses()[0]
 	} else {
 		res, err := s.accountClient.DeriveAddresses(ctx, &pb.DeriveAddressesRequest{
-			AccountName:    ACCOUNT_LABEL,
+			AccountName:    s.accountName,
 			NumOfAddresses: uint64(1),
 		})
 		if err != nil {
@@ -199,7 +200,7 @@ func (s *service) SelectUtxos(
 	ctx context.Context, asset string, value uint64,
 ) ([]UTXO, uint64, error) {
 	res, err := s.txClient.SelectUtxos(ctx, &pb.SelectUtxosRequest{
-		AccountName:  ACCOUNT_LABEL,
+		AccountName:  s.accountName,
 		TargetAsset:  asset,
 		TargetAmount: value,
 	})
@@ -244,7 +245,7 @@ func (s *service) Transfer(
 	ctx context.Context, outs []TxOutput,
 ) (string, error) {
 	res, err := s.txClient.Transfer(ctx, &pb.TransferRequest{
-		AccountName:      ACCOUNT_LABEL,
+		AccountName:      s.accountName,
 		Receivers:        outputList(outs).toProto(),
 		MillisatsPerByte: MSATS_PER_BYTE,
 	})

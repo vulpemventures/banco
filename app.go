@@ -28,7 +28,7 @@ func getTransactionsForAddress(addr, networkName string) ([]Transaction, error) 
 	return transactions, nil
 }
 
-func watchForTrades(order *Order, oceanURL, networkName string) error {
+func watchForTrades(order *Order, oceanURL, oceanAccountName, networkName string) error {
 	if duration := time.Since(order.Timestamp); duration > 10*time.Minute {
 		err := updateOrderStatus(order.ID, "Expired")
 		if err != nil {
@@ -53,6 +53,7 @@ func watchForTrades(order *Order, oceanURL, networkName string) error {
 			order,
 			utxos,
 			oceanURL,
+			oceanAccountName,
 			networkName,
 		)
 		if err != nil {
@@ -78,8 +79,8 @@ func coinsAreMoreThan(utxos []*UTXO, amount uint64) bool {
 	return totalValue >= amount
 }
 
-func executeTrades(order *Order, unspents []*UTXO, oceanURL, networkName string) ([]*Trade, error) {
-	walletSvc, err := NewWalletService(oceanURL)
+func executeTrades(order *Order, unspents []*UTXO, oceanURL, oceanAccountName, networkName string) ([]*Trade, error) {
+	walletSvc, err := NewWalletService(oceanURL, oceanAccountName)
 	if err != nil {
 		return nil, err
 	}

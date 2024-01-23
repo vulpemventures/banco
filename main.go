@@ -25,6 +25,7 @@ func main() {
 	// Set default values
 	viper.SetDefault("WEB_DIR", "web")
 	viper.SetDefault("OCEAN_URL", "localhost:18000")
+	viper.SetDefault("OCEAN_ACCOUNT_NAME", "default")
 	viper.SetDefault("WATCH_INTERVAL_SECONDS", "2")
 	viper.SetDefault("NETWORK", "liquid")
 
@@ -35,6 +36,7 @@ func main() {
 	// Parse environment variables
 	webDir := viper.GetString("WEB_DIR")
 	oceanURL := viper.GetString("OCEAN_URL")
+	oceanAccountName := viper.GetString("OCEAN_ACCOUNT_NAME")
 	networkName := viper.GetString("NETWORK")
 	watchInterval := viper.GetInt("WATCH_INTERVAL_SECONDS")
 
@@ -61,7 +63,7 @@ func main() {
 			}
 			log.Println("Pending orders", len(orders))
 			for _, order := range orders {
-				err = watchForTrades(order, oceanURL, networkName)
+				err = watchForTrades(order, oceanURL, oceanAccountName, networkName)
 				if err != nil {
 					log.Println(fmt.Errorf("error in fulfilling order with ID %s: %v", order.ID, err))
 					continue
