@@ -207,9 +207,10 @@ func (t *Trade) ExecuteTrade() error {
 	}
 
 	// fund the Trade Output amount of the swap
+
 	utxosForTrade, changeAmountForTrade, err := t.walletService.SelectUtxos(context.Background(), t.Order.Output.Asset, t.Order.Output.Amount)
 	if err != nil {
-		return fmt.Errorf("error in SelectUtxos for trade: %w", err)
+		return fmt.Errorf("error in SelectUtxos for trade %s : %f %s : %w", t.Order.ID, float64(t.Order.Output.Amount), t.Order.Output.Asset, err)
 	}
 
 	// subsidize the tx fees

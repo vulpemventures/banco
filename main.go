@@ -61,11 +61,11 @@ func main() {
 				log.Println("error in fetchPendingOrders", err)
 				return
 			}
-			log.Println("Pending orders", len(orders))
+
 			for _, order := range orders {
 				err = watchForTrades(order, oceanURL, oceanAccountName, networkName)
 				if err != nil {
-					log.Println(fmt.Errorf("error in fulfilling order with ID %s: %v", order.ID, err))
+					log.Println(fmt.Errorf("error in fulfilling order of %f %s: ID %s : %w", float64(order.Output.Amount), order.Output.Asset, order.ID, err))
 					continue
 				}
 			}
@@ -94,7 +94,6 @@ func main() {
 		pair := c.Query("pair")
 		tradeType := c.Query("type")
 
-		log.Println(amountStr, pair, tradeType)
 		// Convert the input value to a float
 		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
@@ -240,7 +239,6 @@ func main() {
 		}
 
 		// manipulate template data and render page
-		log.Info(EsploraAPIURLs[networkName])
 		transactionHistory := make([]map[string]interface{}, len(transactions))
 		for i, tx := range transactions {
 			transactionHistory[i] = map[string]interface{}{
