@@ -312,22 +312,22 @@ func main() {
 				}
 
 				// Create a new template
-				tmpl, err := template.ParseFiles("web/transactions.html")
+				tmpl, err := template.ParseFiles(webDir + "/transactions.html")
 				if err != nil {
-					log.Println(err.Error())
+					log.Error(err)
 					return
 				}
 
 				// Execute the template with the data and write the result to a string
 				var html bytes.Buffer
 				if err := tmpl.Execute(&html, data); err != nil {
-					log.Println(err.Error())
+					log.Error(err)
 					return
 				}
 
 				htmlStr := strings.ReplaceAll(html.String(), "\n", " ")
 				messageChan <- htmlStr
-				time.Sleep(3 * time.Second)
+				time.Sleep(time.Duration(watchInterval))
 			}
 		}()
 

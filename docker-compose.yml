@@ -1,0 +1,32 @@
+version: '3'
+
+services:
+  banco:
+    container_name: banco
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8080:8080
+    environment:
+      - NETWORK=testnet
+      - OCEAN_URL=oceand:18000
+    volumes:
+      - banco_volume:/app
+  oceand:
+    container_name: oceand
+    image: ghcr.io/vulpemventures/oceand:v0.2.1
+    environment:
+      - OCEAN_NETWORK=testnet
+      - OCEAN_LOG_LEVEL=5
+      - OCEAN_NO_TLS=true
+      - OCEAN_STATS_INTERVAL=1440
+      - OCEAN_ELECTRUM_URL=ssl://blockstream.info:465
+      - OCEAN_UTXO_EXPIRY_DURATION_IN_SECONDS=10
+      - OCEAN_DB_TYPE=badger
+    volumes:
+      - ./volumes/oceand:/home/ocean/.oceand
+      - ./volumes/ocean-cli:/home/ocean/.ocean-cli
+
+volumes:
+  banco_volume:
