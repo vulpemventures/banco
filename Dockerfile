@@ -25,6 +25,9 @@ FROM alpine:latest
 # Set the working directory inside the container
 WORKDIR /app
 
+# Create a file with the current timestamp
+RUN date > timestamp
+
 # Copy the built binary from the previous stage
 COPY --from=builder /builder/bin/banco /app/banco
 
