@@ -3,12 +3,14 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 )
 
 const (
 	sqliteAdapter  = "sqlite"
-	sqliteFilename = "banco.db"
+	sqliteFilename = "db/banco.db"
 )
 
 type OrderAndStatusRow struct {
@@ -26,6 +28,15 @@ type OrderAndStatusRow struct {
 }
 
 func initDB() (*sql.DB, error) {
+	// Create the db directory if it doesn't exist
+	dir := filepath.Dir(sqliteFilename)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err = os.MkdirAll(dir, 0755)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create directory: %v", err)
+		}
+	}
+
 	db, err := sql.Open(sqliteAdapter, sqliteFilename)
 	if err != nil {
 		return nil, err

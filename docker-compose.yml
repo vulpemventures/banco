@@ -12,7 +12,7 @@ services:
       - NETWORK=testnet
       - OCEAN_URL=oceand:18000
     volumes:
-      - banco_volume:/app
+      - banco_volume:/app/db
   oceand:
     container_name: oceand
     image: ghcr.io/vulpemventures/oceand:v0.2.1

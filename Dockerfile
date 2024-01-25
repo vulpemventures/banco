@@ -25,9 +25,6 @@ FROM alpine:latest
 # Set the working directory inside the container
 WORKDIR /app
 
-# Create a file with the current timestamp
-RUN date > timestamp
-
 # Copy the built binary from the previous stage
 COPY --from=builder /builder/bin/banco /app/banco
 
@@ -44,10 +41,10 @@ EXPOSE 8080
 
 # Use the absolute path for the /web folder to have two separate volumes
 ENV WEB_DIR /web
-#ENV GIN_MODE=release
+ENV GIN_MODE release
 
 # Declare a volume for the database
-VOLUME /app
+VOLUME /app/db
 
 # Set the command to run the server when the container starts
 ENTRYPOINT ["/app/banco"]
