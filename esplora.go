@@ -54,22 +54,19 @@ func (e *Esplora) FetchTransactionHistory(address string) ([]Transaction, error)
 
 	resp, err := http.Get(apiURL)
 	if err != nil {
-		fmt.Printf("Error fetching transaction history: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error fetching transaction history: %w", err)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		fmt.Printf("Error reading response body: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	var transactions []Transaction
 	err = json.Unmarshal(body, &transactions)
 	if err != nil {
-		fmt.Printf("Error unmarshaling JSON: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error unmarshaling JSON: %w", err)
 	}
 
 	return transactions, nil
@@ -80,21 +77,19 @@ func (e *Esplora) FetchPrevout(txHash string, txIndex int) (*transaction.TxOutpu
 
 	resp, err := http.Get(apiURL)
 	if err != nil {
-		fmt.Printf("Error fetching raw transaction: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error fetching raw transaction: %v", err)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		fmt.Printf("Error reading response body: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
 
 	tx, err := transaction.NewTxFromHex(string(body))
 	if err != nil {
-		fmt.Printf("Error creating transaction from hex: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error creating transaction from hex: %v", err)
+
 	}
 
 	txOutput := tx.Outputs[txIndex]
@@ -106,22 +101,19 @@ func (e *Esplora) FetchUnspents(address string) ([]*UTXO, error) {
 
 	resp, err := http.Get(apiURL)
 	if err != nil {
-		fmt.Printf("Error fetching UTXOs: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error fetching UTXOs: %v", err)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		fmt.Printf("Error reading response body: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
 
 	var utxos []*UTXO
 	err = json.Unmarshal(body, &utxos)
 	if err != nil {
-		fmt.Printf("Error unmarshaling JSON: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error unmarshaling JSON: %v", err)
 	}
 
 	return utxos, nil
