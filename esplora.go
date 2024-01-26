@@ -116,5 +116,13 @@ func (e *Esplora) FetchUnspents(address string) ([]*UTXO, error) {
 		return nil, fmt.Errorf("error unmarshaling JSON: %v", err)
 	}
 
+	for _, unspent := range utxos {
+		prevout, err := e.FetchPrevout(unspent.Txid, unspent.Index)
+		if err != nil {
+			return nil, err
+		}
+		unspent.Prevout = prevout
+	}
+
 	return utxos, nil
 }

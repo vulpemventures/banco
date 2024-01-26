@@ -6,12 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Banco - Offer</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 
 <body class="bg-white text-gray-800">
-    <div class="container mx-auto p-8">
+    <div class="container mx-auto p-8"></div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div class="flex flex-col items-center">
                 <div>
@@ -49,7 +50,7 @@
                 </button>
                 {{end}}
             </div>
-            <div hx-sse="connect:/offer/{{.id}}/events swap:message">
+            <div hx-sse="connect:/offer/{{.id}}/transactions swap:message">
                 {{template "transactions.html" .}}
             </div>
         </div>

@@ -185,6 +185,8 @@ github.com/vulpemventures/go-secp256k1-zkp v1.1.6 h1:BmsrmXRLUibwa75Qkk8yELjpzCz
 github.com/vulpemventures/go-secp256k1-zkp v1.1.6/go.mod h1:zo7CpgkuPgoe7fAV+inyxsI9IhGmcoFgyD8nqZaPSOM=
 github.com/vulpemventures/ocean v0.1.19 h1:xhjliKurK6oj/ndt6WcBoVuGLvXsmq58ncmKumNJRPI=
 github.com/vulpemventures/ocean v0.1.19/go.mod h1:U1xP3MCcY7oWwVqN7oxpqyvZGtVqQKBO8f+A10pwW8A=
+github.com/vulpemventures/ocean v0.2.1 h1:M0fx24OIE5REdVzql3T+Vp5voigwx/pI4jG+6SqARlU=
+github.com/vulpemventures/ocean v0.2.1/go.mod h1:7n2gIbfkk7NLGbW3nSd3cuVlso7CYghSm21Z3Db3Xi0=
 go.uber.org/atomic v1.10.0 h1:9qC72Qh0+3MqyJbAn8YU5xVq1frD8bn3JtD2oXtafVQ=
 go.uber.org/atomic v1.10.0/go.mod h1:LUxbIzbOniOlMKjJjyPfpl4v+PKK2cNJn91OQbhoJI0=
 go.uber.org/multierr v1.9.0 h1:7fIwc/ZtS0q++VgcfqFDxSBZVv/Xo49/SYnDFupUwlI=

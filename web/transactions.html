@@ -1,32 +1,27 @@
 <h2 class="text-2xl font-semibold mb-4 relative">Transactions
-  <div class="spinner absolute top-0 right-0" ></div>
+  <div id="spinner" class="spinner absolute top-0 right-0" style="display: none;"></div>
 </h2>
-{{if .transactions}}
-<div class="unconfirmed-transactions">
+
+<div id="pending-transactions">
   <h3 class="text-xl font-semibold mb-2">Pending</h3>
-  {{ $pending := false }}
-  {{range .transactions}}
-  {{if not .confirmed}}
-  {{ $pending = true }}
+  {{if .pendingTransactions}}
+  {{range .pendingTransactions}}
   <div class="transaction-row">
     <p class="transaction-id">
-
       <a href="{{.explorerTxURL}}" target="_blank">🔗 {{.txIDShort}}</a>
     </p>
     <p class="block-time">📆 {{.date}}</p>
   </div>
   {{end}}
-  {{end}}
-  {{if not $pending}}
+  {{else}}
   <p>No pending transactions</p>
   {{end}}
 </div>
-<div class="confirmed-transactions">
+
+<div id="confirmed-transactions">
   <h3 class="text-xl font-semibold mb-2">Confirmed</h3>
-  {{ $confirmed := false }}
-  {{range .transactions}}
-  {{if .confirmed}}
-  {{ $confirmed = true }}
+  {{if .confirmedTransactions}}
+  {{range .confirmedTransactions}}
   <div class="transaction-row">
     <p class="transaction-id">
       <a href="{{.explorerTxURL}}" target="_blank">🔗 {{.txIDShort}}</a>
@@ -34,32 +29,28 @@
     <p class="block-time">📆 {{.date}}</p>
   </div>
   {{end}}
-  {{end}}
-  {{if not $confirmed}}
+  {{else}}
   <p>No confirmed transactions</p>
   {{end}}
 </div>
-{{else}}
-<p>No transactions yet! Make one from any wallet to fund the offer.</p>
-{{end}}
 
 <style>
   .spinner {
-  border: 8px solid #f3f3f3;
-  border-top: 8px solid #3498db;
-  border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  animation: spin 3s linear infinite;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid #3498db;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 3s linear infinite;
   }
 
-  100% {
-    transform: rotate(360deg);
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+
+    100% {
+      transform: rotate(360deg);
+    }
   }
-}
 </style>

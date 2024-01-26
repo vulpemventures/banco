@@ -1,10 +1,13 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/vulpemventures/go-elements/address"
 	"github.com/vulpemventures/go-elements/network"
 )
 
@@ -13,6 +16,21 @@ var SupportedNetworks map[string]*network.Network = map[string]*network.Network{
 	"liquid":  &network.Liquid,
 	"testnet": &network.Testnet,
 	"regtest": &network.Regtest,
+}
+
+func ScriptHashFromAddress(addr string) (string, error) {
+	script, err := address.ToOutputScript(addr)
+	if err != nil {
+		return "", fmt.Errorf("error converting address to output script: %w", err)
+	}
+
+	hashedBuf := sha256.Sum256(script)
+	hash, err := chainhash.NewHash(hashedBuf[:])
+	if err != nil {
+		return "", fmt.Errorf("error creating hash: %w", err)
+	}
+
+	return hash.String(), nil
 }
 
 func getTransactionsForAddress(addr, networkName string) ([]Transaction, error) {
@@ -28,17 +46,12 @@ func getTransactionsForAddress(addr, networkName string) ([]Transaction, error) 
 	return transactions, nil
 }
 
-func watchForTrades(order *Order, oceanURL, oceanAccountName, networkName string) error {
+func watchForTrades(order *Order, walletSvc WalletService, esplora *Esplora) error {
 	if duration := time.Since(order.Timestamp); duration > 10*time.Minute {
 		err := updateOrderStatus(order.ID, "Expired")
 		if err != nil {
 			return fmt.Errorf("error updating order status: %w", err)
 		}
-	}
-
-	esplora, err := NewEsplora(networkName)
-	if err != nil {
-		return fmt.Errorf("esplora initialization error: %w", err)
 	}
 	utxos, err := esplora.FetchUnspents(order.Address)
 	if err != nil {
@@ -52,9 +65,8 @@ func watchForTrades(order *Order, oceanURL, oceanAccountName, networkName string
 		trades, err := executeTrades(
 			order,
 			utxos,
-			oceanURL,
-			oceanAccountName,
-			networkName,
+			walletSvc,
+			esplora,
 		)
 		if err != nil {
 			return fmt.Errorf("error executing trade: %v", err)
@@ -79,24 +91,9 @@ func coinsAreMoreThan(utxos []*UTXO, amount uint64) bool {
 	return totalValue >= amount
 }
 
-func executeTrades(order *Order, unspents []*UTXO, oceanURL, oceanAccountName, networkName string) ([]*Trade, error) {
-	walletSvc, err := NewWalletService(oceanURL, oceanAccountName)
-	if err != nil {
-		return nil, err
-	}
-
-	esplora, err := NewEsplora(networkName)
-	if err != nil {
-		return nil, fmt.Errorf("esplora initialization error: %w", err)
-	}
-
+func executeTrades(order *Order, unspents []*UTXO, walletSvc WalletService, esplora *Esplora) ([]*Trade, error) {
 	trades := []*Trade{}
 	for _, unspent := range unspents {
-		prevout, err := esplora.FetchPrevout(unspent.Txid, unspent.Index)
-		if err != nil {
-			return nil, err
-		}
-		unspent.Prevout = prevout
 		trade, err := FromFundedOrder(
 			walletSvc,
 			order,

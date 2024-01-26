@@ -22,6 +22,7 @@ type service struct {
 	walletClient  pb.WalletServiceClient
 	accountClient pb.AccountServiceClient
 	txClient      pb.TransactionServiceClient
+	notifyClient  pb.NotificationServiceClient
 }
 
 type WalletService interface {
@@ -33,6 +34,7 @@ type WalletService interface {
 	) (string, error)
 	Transfer(ctx context.Context, outs []TxOutput) (string, error)
 	BroadcastTransaction(ctx context.Context, txHex string) (string, error)
+	TransactionNotifications(ctx context.Context, script string) (<-chan *TransactionNotification, error)
 	Close()
 }
 
@@ -73,6 +75,10 @@ type walletStatus struct {
 	*pb.StatusResponse
 }
 
+type getIn struct {
+	*pb.StatusResponse
+}
+
 func (w walletStatus) IsInitialized() bool {
 	return w.StatusResponse.GetInitialized()
 }
@@ -101,6 +107,7 @@ func NewWalletService(addr, accountName string) (WalletService, error) {
 	walletClient := pb.NewWalletServiceClient(conn)
 	accountClient := pb.NewAccountServiceClient(conn)
 	txClient := pb.NewTransactionServiceClient(conn)
+	notifyClient := pb.NewNotificationServiceClient(conn)
 	svc := &service{
 		addr:          addr,
 		accountName:   accountName,
@@ -108,6 +115,7 @@ func NewWalletService(addr, accountName string) (WalletService, error) {
 		walletClient:  walletClient,
 		accountClient: accountClient,
 		txClient:      txClient,
+		notifyClient:  notifyClient,
 	}
 
 	ctx := context.Background()
@@ -194,6 +202,55 @@ func (s *service) GetAddress(
 	}
 
 	return addr, script, nil
+}
+
+type TransactionNotification struct {
+	EventType    string
+	AccountNames []string
+	TxHex        string
+	TxId         string
+	BlockDetails string // Assuming BlockDetails is a string, modify as needed
+}
+
+func (s *service) TransactionNotifications(ctx context.Context, script string) (<-chan *TransactionNotification, error) {
+	//
+	// Create a channel to receive notifications
+	notifChan := make(chan *TransactionNotification)
+
+	// Start the Watch RPC
+	_, err := s.notifyClient.WatchExternalScript(ctx, &pb.WatchExternalScriptRequest{Script: script})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start Watch RPC: %w", err)
+	}
+
+	// Start the TransactionNotifications RPC
+	notifStream, err := s.notifyClient.TransactionNotifications(ctx, &pb.TransactionNotificationsRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start TransactionNotifications RPC: %w", err)
+	}
+
+	// Start a goroutine to receive notifications from the Notification RPC and send them to the channel
+	go func() {
+		for {
+			resp, err := notifStream.Recv()
+			if err != nil {
+				// Handle error...
+				break
+			}
+
+			notif := &TransactionNotification{
+				EventType:    resp.GetEventType().String(),
+				AccountNames: resp.GetAccountNames(),
+				TxHex:        resp.GetTxhex(),
+				TxId:         resp.GetTxid(),
+				BlockDetails: resp.GetBlockDetails().String(), // Modify as needed
+			}
+
+			notifChan <- notif
+		}
+	}()
+
+	return notifChan, nil
 }
 
 func (s *service) SelectUtxos(

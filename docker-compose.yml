@@ -16,6 +16,8 @@ services:
   oceand:
     container_name: oceand
     image: ghcr.io/vulpemventures/oceand:v0.2.1
+    ports:
+      - 18000:18000
     environment:
       - OCEAN_NETWORK=testnet
       - OCEAN_LOG_LEVEL=5
