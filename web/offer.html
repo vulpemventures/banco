@@ -50,7 +50,7 @@
                 </button>
                 {{end}}
             </div>
-            <div hx-sse="connect:/offer/{{.id}}/transactions swap:message">
+            <div hx-ext="sse" sse-connect="/offer/{{.id}}/transactions" sse-swap="transactions">
                 {{template "transactions.html" .}}
             </div>
         </div>

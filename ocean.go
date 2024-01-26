@@ -34,7 +34,8 @@ type WalletService interface {
 	) (string, error)
 	Transfer(ctx context.Context, outs []TxOutput) (string, error)
 	BroadcastTransaction(ctx context.Context, txHex string) (string, error)
-	TransactionNotifications(ctx context.Context, script string) (<-chan *TransactionNotification, error)
+	TransactionNotifications(ctx context.Context) (<-chan *TransactionNotification, error)
+	WatchScript(ctx context.Context, script string) error
 	Close()
 }
 
@@ -205,26 +206,20 @@ func (s *service) GetAddress(
 }
 
 type TransactionNotification struct {
-	EventType    string
-	AccountNames []string
-	TxHex        string
-	TxId         string
-	BlockDetails string // Assuming BlockDetails is a string, modify as needed
+	TxId      string
+	Confirmed bool
+	Timestamp int64
 }
 
-func (s *service) TransactionNotifications(ctx context.Context, script string) (<-chan *TransactionNotification, error) {
+func (s *service) TransactionNotifications(ctx context.Context) (<-chan *TransactionNotification, error) {
 	//
 	// Create a channel to receive notifications
 	notifChan := make(chan *TransactionNotification)
 
-	// Start the Watch RPC
-	_, err := s.notifyClient.WatchExternalScript(ctx, &pb.WatchExternalScriptRequest{Script: script})
-	if err != nil {
-		return nil, fmt.Errorf("failed to start Watch RPC: %w", err)
-	}
-
 	// Start the TransactionNotifications RPC
-	notifStream, err := s.notifyClient.TransactionNotifications(ctx, &pb.TransactionNotificationsRequest{})
+	notifStream, err := s.notifyClient.TransactionNotifications(
+		ctx, &pb.TransactionNotificationsRequest{},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start TransactionNotifications RPC: %w", err)
 	}
@@ -239,11 +234,15 @@ func (s *service) TransactionNotifications(ctx context.Context, script string) (
 			}
 
 			notif := &TransactionNotification{
-				EventType:    resp.GetEventType().String(),
-				AccountNames: resp.GetAccountNames(),
-				TxHex:        resp.GetTxhex(),
-				TxId:         resp.GetTxid(),
-				BlockDetails: resp.GetBlockDetails().String(), // Modify as needed
+				TxId:      resp.GetTxid(),
+				Confirmed: false,
+				Timestamp: 0,
+			}
+
+			blockDetails := resp.GetBlockDetails()
+			if blockDetails != nil {
+				notif.Confirmed = true
+				notif.Timestamp = blockDetails.GetTimestamp()
 			}
 
 			notifChan <- notif
@@ -251,6 +250,15 @@ func (s *service) TransactionNotifications(ctx context.Context, script string) (
 	}()
 
 	return notifChan, nil
+}
+
+func (s *service) WatchScript(ctx context.Context, script string) error {
+	// Start the Watch RPC
+	_, err := s.notifyClient.WatchExternalScript(ctx, &pb.WatchExternalScriptRequest{Script: script})
+	if err != nil {
+		return fmt.Errorf("failed to start Watch RPC: %w", err)
+	}
+	return nil
 }
 
 func (s *service) SelectUtxos(

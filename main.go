@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -211,6 +212,18 @@ func main() {
 			return
 		}
 
+		script, err := address.ToOutputScript(order.Address)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		// Start watching the script and get the notification channel
+		err = walletSvc.WatchScript(c.Request.Context(), hex.EncodeToString(script))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
 		c.Redirect(http.StatusSeeOther, "/offer/"+order.ID)
 	})
 
@@ -241,6 +254,18 @@ func main() {
 		order, status, err := fetchOrderByID(id)
 		if err != nil {
 			c.HTML(http.StatusNotFound, "404.html", gin.H{})
+			return
+		}
+
+		script, err := address.ToOutputScript(order.Address)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		// Start watching the script and get the notification channel
+		err = walletSvc.WatchScript(c.Request.Context(), hex.EncodeToString(script))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -288,187 +313,61 @@ func main() {
 	})
 
 	router.GET("/offer/:id/transactions", func(c *gin.Context) {
-		id := c.Params.ByName("id")
-		order, status, err := fetchOrderByID(id)
+		notifChan, err := walletSvc.TransactionNotifications(c.Request.Context())
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-
-		scriptHash, err := ScriptHashFromAddress(order.Address)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		fmt.Println(scriptHash, order.Address)
-		// Start the TransactionNotifications RPC and get the notification channel
-		notifChan, err := walletSvc.TransactionNotifications(c.Request.Context(), scriptHash)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		// Set the necessary headers for SSE
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		c.Writer.Header().Set("Cache-Control", "no-cache")
 		c.Writer.Header().Set("Connection", "keep-alive")
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
-		// Create a new goroutine
-		go func() {
-			for {
-				select {
-				case <-c.Request.Context().Done():
-					return
-				case <-notifChan:
-					// Determine if the spinner should be shown or hidden based on the status
-					spinnerDisplay := "block"
-					if status == "Fulfilled" || status == "Cancelled" || status == "Expired" {
-						spinnerDisplay = "none"
-					}
+		c.Stream(func(w io.Writer) bool {
+			var confirmedTransactions, pendingTransactions []map[string]interface{}
+			// listen to the tx notification
+			select {
+			case <-c.Request.Context().Done():
+				return false
+			case event := <-notifChan:
+				txid := event.TxId
+				confirmed := event.Confirmed
+				timestamp := event.Timestamp
 
-					// Send the spinner display status to the client as SSE
-					c.SSEvent("spinner", fmt.Sprintf("<div id='spinner' class='spinner absolute top-0 right-0' hx-swap-oob='true' style='display: %s;'></div>", spinnerDisplay))
+				log.Println(txid, confirmed, timestamp)
 
-					transactions, err := getTransactionsForAddress(order.Address, networkName)
-					if err != nil {
-						c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
-						return
-					}
-
-					// Split transactions into confirmed and pending
-					var confirmedTransactions, pendingTransactions []map[string]interface{}
-					for _, tx := range transactions {
-						transaction := map[string]interface{}{
-							"txID":          tx.TxID,
-							"txIDShort":     tx.TxID[:6] + "..." + tx.TxID[len(tx.TxID)-6:],
-							"confirmed":     tx.Status.Confirmed,
-							"date":          time.Unix(int64(tx.Status.BlockTime), 0).Format("2006-01-02 15:04:05"),
-							"explorerTxURL": fmt.Sprintf("%s/tx/%s", EsploraURLs[networkName], tx.TxID),
-						}
-
-						if tx.Status.Confirmed {
-							confirmedTransactions = append(confirmedTransactions, transaction)
-						} else {
-							pendingTransactions = append(pendingTransactions, transaction)
-						}
-					}
-
-					data := map[string]interface{}{
-						"confirmedTransactions": confirmedTransactions,
-						"pendingTransactions":   pendingTransactions,
-					}
-
-					// Create a new template
-					tmpl, err := template.ParseFiles(webDir + "/transactions.html")
-					if err != nil {
-						log.Error(err)
-						return
-					}
-
-					// Execute the template with the data and write the result to a string
-					var html bytes.Buffer
-					if err := tmpl.Execute(&html, data); err != nil {
-						log.Error(err)
-						return
-					}
-
-					htmlStr := strings.ReplaceAll(html.String(), "\n", " ")
-					// Send the notification to the client as SSE
-					c.SSEvent("", htmlStr)
+				transaction := map[string]interface{}{
+					"txID":          txid,
+					"txIDShort":     txid[:6] + "..." + txid[len(txid)-6:],
+					"confirmed":     confirmed,
+					"date":          time.Unix(timestamp, 0).Format("2006-01-02 15:04:05"),
+					"explorerTxURL": fmt.Sprintf("%s/tx/%s", EsploraURLs[networkName], txid),
 				}
+
+				if confirmed {
+					confirmedTransactions = append(confirmedTransactions, transaction)
+				} else {
+					pendingTransactions = append(pendingTransactions, transaction)
+				}
+
+				data := map[string]interface{}{
+					"confirmedTransactions": confirmedTransactions,
+					"pendingTransactions":   pendingTransactions,
+				}
+
+				// Create a new template
+				tmpl, _ := template.ParseFiles(webDir + "/transactions.html")
+				// Execute the template with the data and write the result to a string
+				var html bytes.Buffer
+				tmpl.Execute(&html, data)
+				htmlStr := strings.ReplaceAll(html.String(), "\n", " ")
+				// Send the notification to the client as SSE
+				c.SSEvent("transactions", htmlStr)
 			}
-		}()
+			return true
+		})
 	})
 
-	/* 	router.GET("/offer/:id/events", func(c *gin.Context) {
-	   		id := c.Params.ByName("id")
-
-	   		// Set the necessary headers for SSE
-	   		c.Writer.Header().Set("Content-Type", "text/event-stream")
-	   		c.Writer.Header().Set("Cache-Control", "no-cache")
-	   		c.Writer.Header().Set("Connection", "keep-alive")
-	   		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-
-	   		// Create a new channel, over which we will send the events to the client
-	   		messageChan := make(chan string)
-
-	   		// Create a new goroutine
-	   		go func() {
-	   			var lastHtmlStr string
-	   			var lastTransactions []Transaction
-	   			for {
-	   				order, status, err := fetchOrderByID(id)
-	   				if err != nil {
-	   					log.Println("error fetching order:", err, "Order ID:", id)
-	   					continue
-	   				}
-
-	   				transactions, err := getTransactionsForAddress(order.Address, networkName)
-	   				if err != nil {
-	   					c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
-	   					return
-	   				}
-	   				log.Println(len(transactions))
-	   				if !reflect.DeepEqual(transactions, lastTransactions) {
-	   					transactionHistory := make([]map[string]interface{}, len(transactions))
-	   					for i, tx := range transactions {
-	   						transactionHistory[i] = map[string]interface{}{
-	   							"txID":          tx.TxID,
-	   							"txIDShort":     tx.TxID[:6] + "..." + tx.TxID[len(tx.TxID)-6:],
-	   							"confirmed":     tx.Status.Confirmed,
-	   							"date":          time.Unix(int64(tx.Status.BlockTime), 0).Format("2006-01-02 15:04:05"),
-	   							"explorerTxURL": fmt.Sprintf("%s/tx/%s", EsploraURLs[networkName], tx.TxID),
-	   						}
-	   					}
-
-	   					// Prepare the data
-
-	   					data := map[string]interface{}{
-	   						"status":       status,
-	   						"transactions": transactionHistory,
-	   					}
-
-	   					// Create a new template
-	   					tmpl, err := template.ParseFiles(webDir + "/transactions.html")
-	   					if err != nil {
-	   						log.Error(err)
-	   						return
-	   					}
-
-	   					// Execute the template with the data and write the result to a string
-	   					var html bytes.Buffer
-	   					if err := tmpl.Execute(&html, data); err != nil {
-	   						log.Error(err)
-	   						return
-	   					}
-
-	   					htmlStr := strings.ReplaceAll(html.String(), "\n", " ")
-	   					if htmlStr != lastHtmlStr {
-	   						messageChan <- htmlStr
-	   						lastHtmlStr = htmlStr
-	   					}
-	   					lastTransactions = transactions
-	   				}
-	   				time.Sleep(time.Duration(watchInterval))
-	   			}
-	   		}()
-
-	   		// Create a loop that will continuously write new events to the stream
-	   		for {
-	   			select {
-	   			case html := <-messageChan:
-	   				// Write the HTML string to the response writer
-	   				c.Writer.Write([]byte(fmt.Sprintf("data: %v\n\n", html)))
-	   				c.Writer.Flush()
-	   			case <-c.Done():
-	   				// If the client has disconnected, we can stop sending events
-	   				return
-	   			}
-	   			time.Sleep(time.Duration(watchInterval))
-	   		}
-	   	})
-	*/
 	router.GET("/address-to-script/:address", func(c *gin.Context) {
 		// Extract the address from the URL parameter
 		addr := c.Param("address")
