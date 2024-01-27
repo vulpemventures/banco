@@ -28,6 +28,7 @@ type service struct {
 type WalletService interface {
 	Status(ctx context.Context) (WalletStatus, error)
 	GetAddress(ctx context.Context, isChange bool) (string, []byte, error)
+	Balance(ctx context.Context, assetHash string) (Balance, error)
 	SelectUtxos(ctx context.Context, asset string, amount uint64) ([]UTXO, uint64, error)
 	SignPset(
 		ctx context.Context, pset string, extractRawTx bool,
@@ -164,6 +165,29 @@ func (s *service) Status(
 		return nil, err
 	}
 	return walletStatus{res}, nil
+}
+
+type Balance struct {
+	AvailableBalance uint64
+	PendingBalance   uint64
+}
+
+func (s *service) Balance(ctx context.Context, assetHash string) (Balance, error) {
+	balanceResponse, err := s.accountClient.Balance(ctx, &pb.BalanceRequest{
+		AccountName: s.accountName,
+	})
+	if err != nil {
+		return Balance{}, err
+	}
+	balanceByAsset := balanceResponse.GetBalance()
+	balanceInfo, ok := balanceByAsset[assetHash]
+	if !ok {
+		return Balance{}, fmt.Errorf("asset not found")
+	}
+	return Balance{
+		AvailableBalance: balanceInfo.GetConfirmedBalance(),
+		PendingBalance:   balanceInfo.GetUnconfirmedBalance(),
+	}, nil
 }
 
 func (s *service) GetAddress(

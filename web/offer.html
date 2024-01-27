@@ -12,7 +12,7 @@
 </head>
 
 <body class="bg-white text-gray-800">
-    <div class="container mx-auto p-8"></div>
+    <div class="container mx-auto p-8">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div class="flex flex-col items-center">
                 <div>
@@ -23,7 +23,7 @@
                             <strong>{{.inputValue}} {{.inputCurrency}}</strong>
                         </p>
                         <p class="text-gray-600">
-                            You receive 
+                            You receive
                             <strong>{{.outputValue}} {{.outputCurrency}}</strong>
                         </p>
                         <p class="text-gray-600" hx-get="/offer/{{.id}}/status" hx-swap="innerHTML">
@@ -56,7 +56,7 @@
         </div>
     </div>
 
-    
+
     <script>
         async function payWithMarina() {
             // Send 0.007 LBTC to an address
@@ -72,7 +72,7 @@
         }
     </script>
     <script>
-        new QRCode(document.getElementById("qrcode"),"{{.address}}");
+        new QRCode(document.getElementById("qrcode"), "{{.address}}");
     </script>
     <script>
         function copyToClipboard() {
@@ -119,4 +119,5 @@
         }
     </style>
 </body>
+
 </html>

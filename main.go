@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -71,14 +72,14 @@ func main() {
 		go startWatching(func() {
 			orders, err := fetchOrdersToFulfill()
 			if err != nil {
-				log.Println("error in fetchPendingOrders", err)
+				log.Error(fmt.Errorf("error in fetching orders: %w", err))
 				return
 			}
 
 			for _, order := range orders {
 				err = watchForTrades(order, walletSvc, esplora)
 				if err != nil {
-					log.Println(fmt.Errorf("error in fulfilling order of %f %s: ID %s : %w", float64(order.Output.Amount), order.Output.Asset, order.ID, err))
+					log.Error(fmt.Errorf("error in fulfilling order of %f %s: ID %s : %w", float64(order.Output.Amount), order.Output.Asset, order.ID, err))
 					continue
 				}
 			}
@@ -101,6 +102,51 @@ func main() {
 	router.LoadHTMLGlob(webDir + "/*")
 
 	// API
+	router.GET("/pair", func(c *gin.Context) {
+		pair := c.Query("pair")
+		tradeType := c.Query("type")
+
+		log.Info(pair, tradeType)
+
+		// Get the conversion rate and fee
+		markets, err := GetMarketsWithLimits(c.Request.Context(), walletSvc)
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+			return
+		}
+		mkt := getTradingPair(markets, pair)
+		if mkt == nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("Invalid trading pair %s", pair))
+			return
+		}
+
+		//rate, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
+
+		limit := mkt.BuyLimit
+		currency := mkt.BaseAsset
+		precision := currencyToAsset[mkt.BaseAsset].Precision
+		limitFractional := float64(limit) / math.Pow(10, float64(precision))
+		if tradeType == "Sell" {
+			limit = mkt.SellLimit
+			currency = mkt.QuoteAsset
+			precision = currencyToAsset[mkt.QuoteAsset].Precision
+			limitFractional = float64(limit) / math.Pow(10, float64(precision))
+		}
+
+		// Return the output amount
+		outputValueHTML := fmt.Sprintf(`<div id="pairBox" class="p-4 rounded-lg">
+		<div class="mb-4">
+			<label id="limitText" class="block text-sm font-medium text-gray-700">Limit <strong>%s</strong> %s</label>
+		</div>
+		<div class="mb-4">
+			<label id="rateText" class="block text-sm font-medium text-gray-700">Rate <strong>%s</strong> %s</label>
+		</div>
+	</div>`, fmt.Sprint(limitFractional), currency, "N/A", "")
+
+		// Return the HTML string
+		c.String(http.StatusOK, outputValueHTML)
+	})
+
 	router.GET("/trade/preview", func(c *gin.Context) {
 		// Get the input ticker, output ticker, and amount from the query parameters
 		amountStr := c.Query("amount")
@@ -115,7 +161,8 @@ func main() {
 		}
 
 		// Get the conversion rate and fee
-		mkt := getTradingPair(pair)
+		markets := GetMarkets()
+		mkt := getTradingPair(markets, pair)
 		if mkt == nil {
 			c.String(http.StatusBadRequest, "Invalid trading pair")
 			return
@@ -173,7 +220,8 @@ func main() {
 		}
 
 		// Get the conversion rate and fee
-		mkt := getTradingPair(tradingPair)
+		markets := GetMarkets()
+		mkt := getTradingPair(markets, tradingPair)
 		if mkt == nil {
 			c.String(http.StatusBadRequest, "Invalid trading pair")
 			return
@@ -214,13 +262,13 @@ func main() {
 
 		script, err := address.ToOutputScript(order.Address)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 			return
 		}
 		// Start watching the script and get the notification channel
 		err = walletSvc.WatchScript(c.Request.Context(), hex.EncodeToString(script))
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 			return
 		}
 
@@ -228,7 +276,11 @@ func main() {
 	})
 
 	router.GET("/", func(c *gin.Context) {
-		markets := getMarkets()
+		markets, err := GetMarketsWithLimits(c.Request.Context(), walletSvc)
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+			return
+		}
 		c.HTML(http.StatusOK, "trade.html", gin.H{
 			"markets": markets,
 			"network": networkName,
@@ -240,7 +292,7 @@ func main() {
 
 		ID, err := fetchOrderIDByAddress(addr)
 		if err != nil {
-			log.Println(err.Error())
+			log.Error(err)
 			c.HTML(http.StatusNotFound, "404.html", gin.H{})
 			return
 		}
@@ -312,19 +364,20 @@ func main() {
 		})
 	})
 
+	router.GET("/offer/:id/status", func(c *gin.Context) {
+
+	})
+
 	router.GET("/offer/:id/transactions", func(c *gin.Context) {
 		notifChan, err := walletSvc.TransactionNotifications(c.Request.Context())
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.Writer.Header().Set("Content-Type", "text/event-stream")
-		c.Writer.Header().Set("Cache-Control", "no-cache")
-		c.Writer.Header().Set("Connection", "keep-alive")
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
 		c.Stream(func(w io.Writer) bool {
 			var confirmedTransactions, pendingTransactions []map[string]interface{}
+
 			// listen to the tx notification
 			select {
 			case <-c.Request.Context().Done():
@@ -333,8 +386,6 @@ func main() {
 				txid := event.TxId
 				confirmed := event.Confirmed
 				timestamp := event.Timestamp
-
-				log.Println(txid, confirmed, timestamp)
 
 				transaction := map[string]interface{}{
 					"txID":          txid,
@@ -396,69 +447,3 @@ func startWatching(fn func(), watchInterval int) {
 		time.Sleep(time.Duration(watchInterval) * time.Second)
 	}
 }
-
-/***
-router.GET("/rates", func(c *gin.Context) {
-	// params
-	input := c.Query("inputCurrency")
-	output := c.Query("outputCurrency")
-
-	mkt := getMarket(input, output)
-	if mkt == nil {
-		c.String(http.StatusBadRequest, "Invalid currency pair")
-		return
-	}
-	var operation string
-	var limit uint64
-	if mkt.BaseAsset == output {
-		operation = "Buy"
-		limit = mkt.BuyLimit
-	} else if mkt.QuoteAsset == input {
-		operation = "Sell"
-		limit = mkt.SellLimit
-	}
-
-	// Set the necessary headers for SSE
-	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache")
-	c.Writer.Header().Set("Connection", "keep-alive")
-	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-
-	// Create a new ticker that fires every second
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	// Loop that sends a message every second until the client disconnects
-	for {
-		select {
-		case <-c.Done():
-			// The client has disconnected, stop sending messages
-			return
-		case <-ticker.C:
-			// The ticker has fired, send a message
-			price, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
-			if err != nil {
-				log.Println(err.Error())
-				continue
-			}
-
-			html := fmt.Sprintf("<div>1 %s = %f %s</div>", input, price, output)
-			html += fmt.Sprintf("<div>%s limit: %d</div>", operation, limit)
-
-			// Create the SSE data string
-			sse := fmt.Sprintf("event: rate\ndata: %s\n\n", html)
-
-			// Write the SSE data string to the response
-			_, err = c.Writer.Write([]byte(sse))
-			if err != nil {
-				log.Println(err.Error())
-				return
-			}
-
-			// Flush the response writer to send the data immediately
-			c.Writer.Flush()
-		}
-	}
-})
-
-***/

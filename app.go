@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"log"
@@ -31,6 +32,87 @@ func ScriptHashFromAddress(addr string) (string, error) {
 	}
 
 	return hash.String(), nil
+}
+
+type Market struct {
+	BaseAsset         string
+	QuoteAsset        string
+	BuyPercentageFee  float64
+	SellPercentageFee float64
+	BuyLimit          uint64
+	SellLimit         uint64
+}
+
+func GetMarketsWithLimits(ctx context.Context, walletSvc WalletService) (mkts []*Market, err error) {
+	markets := GetMarkets()
+	for _, market := range markets {
+		market, err := GetMarketWithLimits(ctx, walletSvc, market)
+		if err != nil {
+			return nil, fmt.Errorf("error getting market with limits: %w", err)
+		}
+		mkts = append(mkts, market)
+	}
+
+	return mkts, nil
+}
+
+func GetMarketWithLimits(ctx context.Context, walletSvc WalletService, market *Market) (mkt *Market, err error) {
+	baseAsset, ok := currencyToAsset[market.BaseAsset]
+	if !ok {
+		return nil, fmt.Errorf("asset not found for currency: %s", market.BaseAsset)
+	}
+
+	quoteAsset, ok := currencyToAsset[market.QuoteAsset]
+	if !ok {
+		return nil, fmt.Errorf("asset not found for currency: %s", market.QuoteAsset)
+	}
+
+	baseBalance, err := walletSvc.Balance(ctx, baseAsset.AssetHash)
+	if err != nil {
+		return nil, fmt.Errorf("error getting balance for asset: %s, error: %w", baseAsset.AssetHash, err)
+	}
+
+	quoteBalance, err := walletSvc.Balance(ctx, quoteAsset.AssetHash)
+	if err != nil {
+		return nil, fmt.Errorf("error getting balance for asset: %s, error: %w", quoteAsset.AssetHash, err)
+	}
+
+	market.BuyLimit = baseBalance.AvailableBalance
+	market.SellLimit = quoteBalance.AvailableBalance
+
+	mkt = market
+	return mkt, nil
+}
+
+func GetMarkets() []*Market {
+	return []*Market{
+		{
+			BaseAsset:         "L-BTC",
+			QuoteAsset:        "L-BTC",
+			BuyPercentageFee:  0.1,
+			SellPercentageFee: 0.1,
+			BuyLimit:          0,
+			SellLimit:         0,
+		},
+		{
+			BaseAsset:         "L-BTC",
+			QuoteAsset:        "USDT",
+			BuyPercentageFee:  0.1,
+			SellPercentageFee: 0.75,
+			BuyLimit:          0,
+			SellLimit:         0,
+		},
+		// Add more markets here if needed
+	}
+}
+
+func getTradingPair(markets []*Market, pair string) *Market {
+	for _, market := range markets {
+		if market.BaseAsset+"/"+market.QuoteAsset == pair {
+			return market
+		}
+	}
+	return nil
 }
 
 func getTransactionsForAddress(addr, networkName string) ([]Transaction, error) {

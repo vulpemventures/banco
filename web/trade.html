@@ -26,19 +26,28 @@
           </div>
           <div class="mb-4">
             <label for="pairSelect" class="block text-sm font-medium text-gray-700">Market</label>
-            <select id="pairSelect" name="pair" class="block w-full mt-1 border border-gray-300 rounded-md p-2">
+            <select id="pairSelect" name="pair" class="block w-full mt-1 border border-gray-300 rounded-md p-2"
+              hx-get="/pair" hx-trigger="change, load" hx-vals="js:{ type: tradeType() }" hx-target="#pairBox"
+              hx-swap="outerHTML">
               {{ range .markets }}
               <option value="{{ .BaseAsset }}/{{ .QuoteAsset }}">{{ .BaseAsset }} / {{ .QuoteAsset }}</option>
               {{ end }}
-              <!-- Additional options here -->
             </select>
           </div>
-          <div class="mb-4">
+          <div id="amountBox" class="mb-4">
             <label for="amountInput" class="block text-sm font-medium text-gray-700">Quantity</label>
             <input type="text" id="amountInput" name="amount"
               class="block w-full mt-1 border border-gray-300 rounded-md p-2 input-highlight" placeholder="0.21"
               hx-get="/trade/preview" hx-trigger="keyup changed delay:500ms"
               hx-vals="js:{pair: getSelectedMarket(), type: tradeType() }" hx-target="#recapBox" hx-swap="outerHTML">
+          </div>
+          <div id="pairBox" class="p-4 rounded-lg">
+            <div class="mb-4">
+              <label id="limitText" class="block text-sm font-medium text-gray-700"></label>
+            </div>
+            <div class="mb-4">
+              <label id="rateText" class="block text-sm font-medium text-gray-700"></label>
+            </div>
           </div>
           <div id="recapBox" class="p-4 bg-gray-100 rounded-lg" style="display: none;">
             <label id="recapText" class="block text-sm font-medium text-gray-700"></label>
@@ -74,6 +83,7 @@
   </div>
   <script>
     window.onload = async function () {
+      // marina
       const isEnabled = await window.marina.isEnabled();
       const traderScript = localStorage.getItem('traderScript')
       const traderAddress = localStorage.getItem('traderAddress')
@@ -81,10 +91,6 @@
       if (isEnabled && traderScript && traderAddress)
         updateViewAfterConnect(traderScript, traderAddress);
     }
-
-    document.body.addEventListener('htmx:configRequest', function (evt) {
-
-    });
 
     function getSelectedMarket() {
       const selectElement = document.getElementById('pairSelect');
@@ -101,7 +107,7 @@
       return document.querySelector('input[name="type"]:checked').value;
     }
 
-    function changeTradeType() {
+    async function changeTradeType() {
       // clear amount
       const amountInput = document.getElementById('amountInput');
       amountInput.value = '';
@@ -109,6 +115,9 @@
       // hide the recap box
       const recapBox = document.getElementById('recapBox')
       recapBox.style.display = 'none'
+
+      // re-fetch trading pair info
+      htmx.ajax('GET', '/pair', {target:'#pairBox', swap:'outerHTML', values: { pair: getSelectedMarket(), type: tradeType() }})
     }
 
     async function onConnectInputChange() {
