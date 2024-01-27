@@ -4,6 +4,8 @@
 
 Banco uses Taproot and Elements introspection opcodes to enable an efficient and decentralized trading protocol between two or more parties using a non-interactive atomic swap construction.
 
+Try it out at [banco.vulpem.com](https://banco.vulpem.com) running a Liquid Testnet instance.
+
 ## 🧿 Protocol
 
 ### 🍔 TL;DR
