@@ -407,10 +407,18 @@ func main() {
 				}
 
 				// Create a new template
-				tmpl, _ := template.ParseFiles(webDir + "/transactions.html")
+				tmpl, err := template.ParseFiles(webDir + "/transactions.html")
+				if err != nil {
+					c.SSEvent("error", err.Error())
+					return false
+				}
 				// Execute the template with the data and write the result to a string
 				var html bytes.Buffer
-				tmpl.Execute(&html, data)
+				err = tmpl.Execute(&html, data)
+				if err != nil {
+					c.SSEvent("error", err.Error())
+					return false
+				}
 				htmlStr := strings.ReplaceAll(html.String(), "\n", " ")
 				// Send the notification to the client as SSE
 				c.SSEvent("transactions", htmlStr)

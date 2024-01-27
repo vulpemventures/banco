@@ -11,6 +11,9 @@ services:
     environment:
       - NETWORK=testnet
       - OCEAN_URL=oceand:18000
+      - OCEAN_ACCOUNT_NAME=default
+      - WATCH_INTERVAL_SECONDS=5
+      - GIN_MODE=debug
     volumes:
       - banco_volume:/app/db
   oceand:
