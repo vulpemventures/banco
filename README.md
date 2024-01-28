@@ -6,14 +6,6 @@ Banco uses Taproot and Elements introspection opcodes to enable an efficient and
 
 Try it out at [banco.vulpem.com](https://banco.vulpem.com) running a Liquid Testnet instance.
 
-## 🧿 Protocol
-
-### 🍔 TL;DR
-
-It requires two transactions, one to **fund** the "trade contract" and another to either **fulfill** or **cancel** it.
-*Anyone* can fulfill the contract as soon is seen on the mempool, but only the maker can cancel it.
-The contract enforces that the first output has the requested value, asset and script in the spending transaction.
-
 ## Why?
 
 - **Non-interactive** is a desirable property for atomic swaps. It allows the maker to create a transaction that can be fulfilled by the taker without any further interaction from the maker.
@@ -23,6 +15,14 @@ The contract enforces that the first output has the requested value, asset and s
 - **Liquidity efficient**  The maker can create a transaction that can be fulfilled by the taker at any time (as long the maker does not cancel it wih a double-spend). This allows the taker to provide liquidity via automated bots that can fulfill the transaction without the risk of the capital to be locked for a long time (as it happens with time-locked contracts).
 
 - **Decentralized** The protocol is completely decentralized and does not require any trusted third party, being non-custodial for traders and capital efficient for market makers, without the need of centralized "order-book" server. The taker simply observes the mempool for pending contracts to fulfill.
+
+## 🧿 Protocol
+
+### 🍔 TL;DR
+
+It requires two transactions, one to **fund** the "trade contract" and another to either **fulfill** or **cancel** it.
+*Anyone* can fulfill the contract as soon is seen on the mempool, but only the maker can cancel it.
+The contract enforces that the first output has the requested value, asset and script in the spending transaction.
 
 In-depth explanation can be found in the [protocol](./PROTOCOL.md) document.
 
