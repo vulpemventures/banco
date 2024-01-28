@@ -28,7 +28,9 @@ The trade contract is a Taproot address that uses [Elements introspection opcode
 
 ### Spending Conditions
 
-Unspendable key-path and two script-path branches:
+#### Key Path
+
+Maker's signature to cancel the trade, especially helpful when refunding from under-funded contracts.
 
 #### Fulfill clause
 
@@ -82,8 +84,6 @@ OP_DROP
 OP_EQUAL
 ```
 
-
-
 ## Transactions
 
 ### Funding transaction
@@ -107,4 +107,17 @@ If the maker decides they no longer wish to trade, they can cancel the contract.
 
 ## Known issues
 
-- The cancel path "as is" should become the key-path spend, to avoid anyone to halt a trade by spending the output that returns the funds to the maker. It requires direct wallet integration which restricts the maker to use only specific wallets that supports creating and signing a spending transaction from the trade contract address.
+### Under or Over funded contracts
+
+Handling under-funded or over-funded contracts is not trivial.
+The key-path spend it the simplest solution, but requires the maker's wallet to support the generation of the trade contracts or being able to provide a public key, to import an output script and to sign a taproot transaction. 
+This goes against the goal of being easy to integrate.
+
+You could keep an "hidden" script path to allow the maker to cancel the contract in case of under-funding.
+by simply stacking fee-paying inputs to the transaction and asset inputs to matcht the original amount when under-funded.
+Assuming 64 bit arithmetic opcodes are available, the maker could cancel the contract in case of under-funding calculating the actual value of the output to return on the stack.
+
+### DoS attack
+
+Anyone could halt a trade by spending the output via the cancel clause that returns the funds to the maker. It's reccomended to not leak the entitre taproot tree to the public, but only the fulfill leaf script.
+This is not a problem for OTC trading, but it may be for public trading.
