@@ -120,7 +120,11 @@ func main() {
 			return
 		}
 
-		//rate, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
+		rate, err := rates.MarketPrice(mkt.BaseAsset, mkt.QuoteAsset)
+		if err != nil {
+			rate = -1
+			return
+		}
 
 		limit := mkt.BuyLimit
 		currency := mkt.BaseAsset
@@ -141,7 +145,7 @@ func main() {
 		<div class="mb-4">
 			<label id="rateText" class="block text-sm font-medium text-gray-700">Rate <strong>%s</strong> %s</label>
 		</div>
-	</div>`, fmt.Sprint(limitFractional), currency, "N/A", "")
+	</div>`, fmt.Sprint(limitFractional), currency, fmt.Sprint(rate), mkt.QuoteAsset)
 
 		// Return the HTML string
 		c.String(http.StatusOK, outputValueHTML)
