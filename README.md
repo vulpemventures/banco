@@ -24,9 +24,18 @@ The contract enforces that the first output has the requested value, asset and s
 
 - **Decentralized** The protocol is completely decentralized and does not require any trusted third party, being non-custodial for traders and capital efficient for market makers, without the need of centralized "order-book" server. The taker simply observes the mempool for pending contracts to fulfill.
 
-In-depth explanation and comparisons with other trading protocols can be found in the [protocol](./PROTOCOL.md) document.
+In-depth explanation can be found in the [protocol](./PROTOCOL.md) document.
 
 ## 🏃 Show me the code
+
+### 🏛️ Architecture
+
+Banco is composed by two main components:
+
+- **`bancod`**: A web-server written in Go that serves the web application to accept trades, it interface with a Liquid wallet and monitors pending trade contracts to be fulfilled.
+- **Ocean**: An Elements wallet daemon that is used by Banco, an automated taker that fulfills pending contracts in the mempool.
+
+### 📦 Download
 
 The most simple way to run Banco locally is using docker. Standalone installation instructions coming soon.
 
