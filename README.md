@@ -10,10 +10,17 @@ Try it out at [banco.vulpem.com](https://banco.vulpem.com) running a Liquid Test
 
 ### 🍔 TL;DR
 
-It requires two transactions, one to fund the "contract" and another to either "fulfill" or "cancel". Anybody can fulfill the contract, but only the maker can cancel it. The contract enforces with a covenants on the value, the asset and the script that must be present in the transaction to be fulfill-ed.
+It requires two transactions, one to **fund** the "trade contract" and another to either **fulfill** or **cancel** it.
+*Anyone* can fulfill the contract, but only the maker can cancel it.
+The contract enforces that the first output has the requested value, asset and script in the spending transaction.
+
 <div style="display: flex; justify-content: center;">
   <img src="non-interactive-atomic-swaps.png" alt="diagram">
 </div>
+
+
+In-depth explanation and comparisons with other trading protocols can be found in the [protocol](./PROTOCOL.md) document.
+
 
 ## Why?
 
@@ -24,8 +31,6 @@ It requires two transactions, one to fund the "contract" and another to either "
 - **Liquidity efficient**  The maker can create a transaction that can be fulfilled by the taker at any time (as long the maker does not cancel it wih a double-spend). This allows the taker to provide liquidity via automated bots that can fulfill the transaction without the risk of the capital to be locked for a long time (as it happens with time-locked contracts).
 
 - **Decentralized** The protocol is completely decentralized and does not require any trusted third party, being non-custodial for traders and capital efficient for market makers, without the need of centralized "order-book" server. The taker simply observes the mempool for pending contracts to fulfill.
-
-In-depth explanation and comparisons with other protocols can be found in the [protocol](./PROTOCOL.md) document.
 
 ## 🏃 Show me the code
 
