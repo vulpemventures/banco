@@ -7,7 +7,7 @@
 ## Design Goals
 
 1. **Confidentiality**: The protocol should be confidential by default. The maker and taker should be able to trade without revealing their intentions to the public.
-2. **Easieness of integration**: The protocol should be easy to use and should not require any specific wallet integration. The maker should be able to fund a trade contract with any wallet that supports sending to a Taproot address.
+2. **Easiness of integration**: The protocol should be easy to use and should not require any specific wallet integration. The maker should be able to fund a trade contract with any wallet that supports sending to a Taproot address.
 3. **Liquidity efficient**: The maker should be able to create a transaction that can be fulfilled by the taker at any time (as long the maker does not cancel it wih a double-spend). This allows the taker to provide liquidity via automated bots that can fulfill the transaction without the risk of the capital to be locked for a long time (as it happens with time-locked atomic-swaps).
 4. **Decentralized**: The protocol should be completely decentralized and should not require any trusted third party, being non-custodial for traders and capital efficient for market makers, without the need of centralized "order-book" server or settlment facilities. The taker should simply observe the mempool for pending public contracts to fulfill.
 5. **Operational Security**: The protocol should allow the taker to operate an always-on bot that can fulfill trades without the need of interacting with the maker to close the trade, avoiding hot-wallets and the need of a maker to be online and reachable to close the trade.
