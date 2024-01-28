@@ -11,16 +11,8 @@ Try it out at [banco.vulpem.com](https://banco.vulpem.com) running a Liquid Test
 ### 🍔 TL;DR
 
 It requires two transactions, one to **fund** the "trade contract" and another to either **fulfill** or **cancel** it.
-*Anyone* can fulfill the contract, but only the maker can cancel it.
+*Anyone* can fulfill the contract as soon is seen on the mempool, but only the maker can cancel it.
 The contract enforces that the first output has the requested value, asset and script in the spending transaction.
-
-<div style="display: flex; justify-content: center;">
-  <img src="non-interactive-atomic-swaps.png" alt="diagram">
-</div>
-
-
-In-depth explanation and comparisons with other trading protocols can be found in the [protocol](./PROTOCOL.md) document.
-
 
 ## Why?
 
@@ -32,7 +24,18 @@ In-depth explanation and comparisons with other trading protocols can be found i
 
 - **Decentralized** The protocol is completely decentralized and does not require any trusted third party, being non-custodial for traders and capital efficient for market makers, without the need of centralized "order-book" server. The taker simply observes the mempool for pending contracts to fulfill.
 
+In-depth explanation can be found in the [protocol](./PROTOCOL.md) document.
+
 ## 🏃 Show me the code
+
+### 🏛️ Architecture
+
+Banco is composed by the following components and pieces:
+
+- **`banco`**: A web-server written in Go that serves an HTMX web application to accept trades from makers. It monitors the mempool for fundend trade contracts to be fulfilled. It writes trade data to a SQLite database in `./db/banco.db`
+- **`ocean`**: An Elements wallet daemon that is used by Banco to fund the fulfill transactions. It supports an embedded database or PostgreSQL.
+
+### 📦 Download
 
 The most simple way to run Banco locally is using docker. Standalone installation instructions coming soon.
 
