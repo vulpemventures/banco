@@ -174,7 +174,6 @@ func main() {
 			return
 		}
 
-		// TODO check if need to be inverse
 		feePercentage := rates.FeePercentage(mkt.BaseAsset, mkt.QuoteAsset)
 
 		// Calculate the output amount
@@ -212,6 +211,8 @@ func main() {
 			return
 		}
 
+		log.Infof("tradingPair: %s, tradeType: %s, amountStr: %s", tradingPair, tradeType, amountStr)
+
 		// Convert the input value to a float
 		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
@@ -232,12 +233,13 @@ func main() {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("error getting price from stream: %v", err))
 			return
 		}
+
 		feePercentage := rates.FeePercentage(mkt.BaseAsset, mkt.QuoteAsset)
 		// Determine the input value, input currency, output value, and output currency based on the trade type
 		var inputValue, outputValue float64
 		var inputCurrency, outputCurrency string
 		if tradeType == "Buy" {
-			inputValue = amount * (1 + feePercentage/100) // Add the fee to the input value
+			inputValue = amount * price * (1 + feePercentage/100) // Add the fee to the input value
 			inputCurrency = mkt.QuoteAsset
 			outputValue = amount
 			outputCurrency = mkt.BaseAsset
@@ -247,6 +249,8 @@ func main() {
 			outputValue = amount * price * (1 - feePercentage/100) // Subtract the fee from the output value
 			outputCurrency = mkt.QuoteAsset
 		}
+
+		log.Infof("inputValue: %v, outputValue: %v", inputValue, outputValue)
 
 		order, err := NewOrder(traderScriptHex, inputCurrency, fmt.Sprintf("%v", inputValue), outputCurrency, fmt.Sprintf("%v", outputValue), price, net)
 		if err != nil {

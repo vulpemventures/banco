@@ -72,14 +72,13 @@ func NewOrder(traderScriptHex, inputCurrency, inputValue, outputCurrency, output
 	}
 
 	// Calculate the expected output value with the slippage tolerance
-	expectedOutputValue := inputValueFloat * rate
-	slippage := expectedOutputValue * 0.03 // 3% slippage
-	minExpectedOutputValue := expectedOutputValue - slippage
-	maxExpectedOutputValue := expectedOutputValue + slippage
-	proposedRate := outputValueFloat / inputValueFloat
+	proposedRate := 1 / (outputValueFloat / inputValueFloat)
+	slippage := rate * 0.03 // 3% slippage
+	minExpectedRate := rate - slippage
+	maxExpectedRate := rate + slippage
 
-	if outputValueFloat < minExpectedOutputValue || outputValueFloat > maxExpectedOutputValue {
-		return nil, fmt.Errorf("proposed %f rate is outside the expected rate %f", proposedRate, rate)
+	if proposedRate < minExpectedRate || proposedRate > maxExpectedRate {
+		return nil, fmt.Errorf("proposed rate %f is outside the expected range (%f to %f)", proposedRate, minExpectedRate, maxExpectedRate)
 	}
 
 	fulfillScript, err := FulfillScript(traderScript, outputAmount, outputAssetBytes)

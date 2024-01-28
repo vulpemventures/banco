@@ -20,8 +20,8 @@ type Rates struct {
 
 type KrakenClient struct {
 	ws           *ws.Kraken
-	quitChan     chan bool
 	PriceStreams map[string]chan float64
+	LastPrices   map[string]float64
 }
 
 func NewKrakenClient() *KrakenClient {
@@ -29,7 +29,11 @@ func NewKrakenClient() *KrakenClient {
 	if err := kraken.Connect(); err != nil {
 		log.Fatalf("Error connecting to web socket: %s", err.Error())
 	}
-	return &KrakenClient{ws: kraken}
+	return &KrakenClient{
+		ws:           kraken,
+		PriceStreams: make(map[string]chan float64),
+		LastPrices:   make(map[string]float64),
+	}
 }
 
 func (kc *KrakenClient) FeePercentage(base, quote string) float64 {
@@ -39,18 +43,12 @@ func (kc *KrakenClient) FeePercentage(base, quote string) float64 {
 }
 
 func (kc *KrakenClient) MarketPrice(base, quote string) (float64, error) {
-
-	priceStream, ok := kc.PriceStreams[base+"/"+quote]
+	marketPair := base + "/" + quote
+	price, ok := kc.LastPrices[marketPair]
 	if !ok {
-		return 0, fmt.Errorf("no price stream available for market pair: %s/%s", base, quote)
+		return 0, fmt.Errorf("no price available for market pair: %s", marketPair)
 	}
-	// Read the first price from the stream with a timeout
-	select {
-	case price := <-priceStream:
-		return price, nil
-	case <-time.After(10 * time.Second): // adjust the timeout as needed
-		return 0, fmt.Errorf("timeout waiting for price %s", base+"/"+quote)
-	}
+	return price, nil
 }
 
 func (kc *KrakenClient) Subscribe() error {
@@ -58,9 +56,17 @@ func (kc *KrakenClient) Subscribe() error {
 	kc.PriceStreams = make(map[string]chan float64)
 
 	// Create channels to stream the market prices
-	kc.PriceStreams["FUSD/USDT"] = make(chan float64)
 	kc.PriceStreams["L-BTC/USDT"] = make(chan float64)
 	kc.PriceStreams["L-BTC/L-BTC"] = make(chan float64)
+
+	// Start a goroutine for each market pair to read from the WebSocket and update the last price
+	for marketPair, priceStream := range kc.PriceStreams {
+		go func(marketPair string, priceStream chan float64) {
+			for price := range priceStream {
+				kc.LastPrices[marketPair] = price
+			}
+		}(marketPair, priceStream)
+	}
 
 	// XBT/USDT
 	// Subscribe to ticker information for the trading pair
@@ -71,32 +77,18 @@ func (kc *KrakenClient) Subscribe() error {
 	go func() {
 		defer close(kc.PriceStreams["L-BTC/USDT"])
 
-		for range kc.ws.Listen() {
-			select {
-			case <-kc.quitChan:
-				return
-			case update := <-kc.ws.Listen():
-				switch data := update.Data.(type) {
-				case ws.TickerUpdate:
-					price, err := data.Close.Today.Float64()
-					if err != nil {
-						log.Println("Error parsing price:", err)
-						continue
-					}
-					kc.PriceStreams["L-BTC/USDT"] <- price
-				default:
-					return
+		for update := range kc.ws.Listen() {
+			switch data := update.Data.(type) {
+			case ws.TickerUpdate:
+				price, err := data.Ask.Price.Float64()
+				if err != nil {
+					log.Println("Error parsing price:", err)
+					continue
 				}
+				kc.PriceStreams["L-BTC/USDT"] <- price
+			default:
+				return
 			}
-		}
-	}()
-
-	// FUSD/USDT
-	// For now we fix the exchange rate to 1:1
-	go func() {
-		for {
-			kc.PriceStreams["FUSD/USDT"] <- 1.00
-			time.Sleep(1 * time.Second)
 		}
 	}()
 

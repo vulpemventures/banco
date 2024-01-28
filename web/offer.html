@@ -40,17 +40,19 @@
                     <input id="walletAddress" type="text" value="{{.address}}"
                         class="border rounded-l-lg p-2 flex-grow text-lg" readonly>
                     <button onclick="copyToClipboard()"
-                        class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded-r-lg">
+                        class="bg-white hover:bg-gray-200 text-black text-sm py-2 px-2 rounded-r-lg border border-black">
                         Copy
                     </button>
                 </div>
                 <button onclick="payWithMarina()"
-                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 mt-4 rounded">
-                    Pay with Marina
-                </button>
+                class="bg-green-200 hover:bg-green-300 text-black font-bold py-2 px-4 mt-4 rounded h-full w-3/4">
+                Pay with Marina
+            </button>
+
                 {{end}}
             </div>
-            <div hx-ext="sse" sse-connect="/offer/{{.id}}/transactions" sse-swap="transactions">
+            <!-- <div hx-ext="sse" sse-connect="/offer/{{.id}}/transactions" sse-swap="transactions"> -->
+            <div>
                 {{template "transactions.html" .}}
             </div>
         </div>
