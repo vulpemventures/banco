@@ -30,10 +30,10 @@ In-depth explanation can be found in the [protocol](./PROTOCOL.md) document.
 
 ### 🏛️ Architecture
 
-Banco is composed by two main components:
+Banco is composed by the following components and pieces:
 
-- **`bancod`**: A web-server written in Go that serves the web application to accept trades, it interface with a Liquid wallet and monitors pending trade contracts to be fulfilled.
-- **Ocean**: An Elements wallet daemon that is used by Banco, an automated taker that fulfills pending contracts in the mempool.
+- **`banco`**: A web-server written in Go that serves an HTMX web application to accept trades from makers. It monitors the mempool for fundend trade contracts to be fulfilled. It writes trade data to a SQLite database in `./db/banco.db`
+- **`ocean`**: An Elements wallet daemon that is used by Banco to fund the fulfill transactions. It supports an embedded database or PostgreSQL.
 
 ### 📦 Download
 
