@@ -102,7 +102,7 @@ If the maker decides they no longer wish to trade, they can cancel the contract.
 ## Considerations
 
 - One of the main issue of interactive atomic swaps is the free-option problem. The taker can decide to not fulfill the contract and the maker is left with a locked capital or the need of a counter-party server to close the trade. This is solved by the non-interactive nature of the protocol. The maker can cancel the contract at any time, but any taker can fulfill it without the need of any interaction with the maker.
-- If the maker gernerates the address and "pings" a specific taker privately, the trade is confiedential, perfect for OTC trading.
+- If the maker generates the address and "pings" a specific taker privately, the trade is confidential, perfect for OTC trading.
 - If the maker broadcasts the address publicly (along with the taproot leaf script), the trade is public and anyonce can fulfill it. Block producers can extract financial value from transaction re-oredering, unless the blockchain supports Confidential Transactions and taker and maker can dervie a shared secret to blind the transaction.
 
 ## Known issues
