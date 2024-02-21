@@ -6,6 +6,8 @@ Banco uses Taproot and Elements introspection opcodes to enable an efficient and
 
 Try it out at [banco.vulpem.com](https://banco.vulpem.com) running a Liquid Testnet instance.
 
+Read more on the introductory blog post https://vulpem.medium.com/banco-non-interactive-swaps-00d042791e06
+
 ## Why?
 
 - **Non-interactive** is a desirable property for atomic swaps. It allows the maker to create a transaction that can be fulfilled by the taker without any further interaction from the maker.
@@ -14,7 +16,7 @@ Try it out at [banco.vulpem.com](https://banco.vulpem.com) running a Liquid Test
 
 - **Liquidity efficient**  The maker can create a transaction that can be fulfilled by the taker at any time (as long the maker does not cancel it wih a double-spend). This allows the taker to provide liquidity via automated bots that can fulfill the transaction without the risk of the capital to be locked for a long time (as it happens with time-locked contracts).
 
-- **Decentralized** The protocol is completely decentralized and does not require any trusted third party, being non-custodial for traders and capital efficient for market makers, without the need of centralized "order-book" server. The taker simply observes the mempool for pending contracts to fulfill.
+- **Decentralized** The protocol is completely decentralized and does not require any trusted third party, being non-custodial for traders and capital efficient for market makers, without the need of a centralized "order-book" server. The taker simply observes the mempool for pending contracts to fulfill.
 
 ## 🧿 Protocol
 
@@ -30,9 +32,9 @@ In-depth explanation can be found in the [protocol](./PROTOCOL.md) document.
 
 ### 🏛️ Architecture
 
-Banco is composed by the following components and pieces:
+Banco is composed of the following components and pieces:
 
-- **`banco`**: A web-server written in Go that serves an HTMX web application to accept trades from makers. It monitors the mempool for fundend trade contracts to be fulfilled. It writes trade data to a SQLite database in `./db/banco.db`
+- **`banco`**: A web server written in Go that serves an HTMX web application to accept trades from makers. It monitors the mempool for funded trade contracts to be fulfilled. It writes trade data to an SQLite database in `./db/banco.db`
 - **`ocean`**: An Elements wallet daemon that is used by Banco to fund the fulfill transactions. It supports an embedded database or PostgreSQL.
 
 ### 📦 Download
